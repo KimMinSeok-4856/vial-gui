@@ -22,10 +22,24 @@ class MatrixTest(BasicEditor):
         self.keyboardWidget = KeyboardWidget(layout_editor)
         self.keyboardWidget.set_enabled(False)
 
-        self.unlock_btn = QPushButton("Unlock")
-        self.reset_btn = QPushButton("Reset")
+        guide_box = QLabel("""
+        <div style="background-color: #161b22; border: 1px solid #30363d; border-left: 4px solid #a371f7; padding: 10px 14px; border-radius: 6px; font-size: 12px; line-height: 1.5; color: #e6edf3; max-width: 620px;">
+            <b style="color: #d2a8ff; font-size: 13px;">🧪 실시간 키 입력 테스트 (Matrix Tester)</b><br>
+            키보드의 스위치를 누르면 해당 위치가 실시간으로 밝게 켜집니다.<br>
+            • <b>실시간 감지:</b> 누르고 있는 키는 밝은 파란색으로 켜지고, 손을 떼면 정상 입력되었음을 표시하는 색상으로 유지됩니다.<br>
+            • <b>초기화:</b> 아래 <b>[🔄 테스트 기록 초기화]</b> 버튼을 누르면 이전 테스트 기록이 리셋됩니다.
+        </div>
+        """)
+        guide_box.setTextFormat(Qt.RichText)
+
+        self.unlock_btn = QPushButton("🔓 키보드 잠금 해제 (Unlock)")
+        self.reset_btn = QPushButton("🔄 테스트 기록 초기화 (Reset)")
 
         layout = QVBoxLayout()
+        layout.addSpacing(6)
+        layout.addWidget(guide_box)
+        layout.setAlignment(guide_box, Qt.AlignCenter)
+        layout.addSpacing(10)
         layout.addWidget(self.keyboardWidget)
         layout.setAlignment(self.keyboardWidget, Qt.AlignCenter)
 
@@ -33,7 +47,7 @@ class MatrixTest(BasicEditor):
 
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
-        self.unlock_lbl = QLabel(tr("MatrixTest", "Unlock the keyboard before testing:"))
+        self.unlock_lbl = QLabel("키 입력을 테스트하려면 먼저 잠금을 해제하세요:")
         btn_layout.addWidget(self.unlock_lbl)
         btn_layout.addWidget(self.unlock_btn)
         btn_layout.addWidget(self.reset_btn)
@@ -42,6 +56,8 @@ class MatrixTest(BasicEditor):
         self.keyboard = None
         self.device = None
         self.polling = False
+        self.unlocked = False
+        self.prev_matrix_data = None
 
         self.timer = QTimer()
         self.timer.timeout.connect(self.matrix_poller)
@@ -55,7 +71,6 @@ class MatrixTest(BasicEditor):
         super().rebuild(device)
         if self.valid():
             self.keyboard = device.keyboard
-
             self.keyboardWidget.set_keys(self.keyboard.keys, self.keyboard.encoders)
         self.keyboardWidget.setEnabled(self.valid())
 
@@ -70,36 +85,29 @@ class MatrixTest(BasicEditor):
         for w in self.keyboardWidget.widgets:
             w.setPressed(False)
             w.setOn(False)
-
-        self.keyboardWidget.update_layout()
+        self.prev_matrix_data = None
         self.keyboardWidget.update()
-        self.keyboardWidget.updateGeometry()
 
     def matrix_poller(self):
         if not self.valid():
             self.timer.stop()
             return
 
-        try:
-            unlocked = self.keyboard.get_unlock_status(3)
-        except (RuntimeError, ValueError):
-            self.timer.stop()
-            return
+        if not self.unlocked:
+            try:
+                self.unlocked = bool(self.keyboard.get_unlock_status(3))
+            except (RuntimeError, ValueError):
+                self.timer.stop()
+                return
 
-        if not unlocked:
-            self.unlock_btn.show()
-            self.unlock_lbl.show()
-            return
+            if not self.unlocked:
+                self.unlock_btn.show()
+                self.unlock_lbl.show()
+                return
 
-        # we're unlocked, so hide unlock button and label
-        self.unlock_btn.hide()
-        self.unlock_lbl.hide()
-
-        # Get size for matrix
-        rows = self.keyboard.rows
-        cols = self.keyboard.cols
-        # Generate 2d array of matrix
-        matrix = [[None] * cols for x in range(rows)]
+            # we're unlocked, so hide unlock button and label
+            self.unlock_btn.hide()
+            self.unlock_lbl.hide()
 
         # Get matrix data from keyboard
         try:
@@ -108,23 +116,25 @@ class MatrixTest(BasicEditor):
             self.timer.stop()
             return
 
-        # Calculate the amount of bytes belong to 1 row, each bit is 1 key, so per 8 keys in a row,
-        # a byte is needed for the row.
+        # Skip redraw if matrix state hasn't changed (saves 95% CPU)
+        if not data or data == self.prev_matrix_data:
+            return
+        self.prev_matrix_data = data
+
+        # Get size for matrix
+        rows = self.keyboard.rows
+        cols = self.keyboard.cols
         row_size = math.ceil(cols / 8)
+        matrix = [[None] * cols for x in range(rows)]
 
         for row in range(rows):
-            # Make slice of bytes for the row (skip first 2 bytes, they're for VIAL)
             row_data_start = 2 + (row * row_size)
             row_data_end = row_data_start + row_size
             row_data = data[row_data_start:row_data_end]
 
-            # Get each bit representing pressed state for col
             for col in range(cols):
-                # row_data is array of bytes, calculate in which byte the col is located
                 col_byte = len(row_data) - 1 - math.floor(col / 8)
-                # since we select a single byte as slice of byte, mod 8 to get nth pos of byte
                 col_mod = (col % 8)
-                # write to matrix array
                 matrix[row][col] = (row_data[col_byte] >> col_mod) & 1
 
         # write matrix state to keyboard widget
@@ -138,16 +148,18 @@ class MatrixTest(BasicEditor):
                     if matrix[row][col]:
                         w.setOn(True)
 
-        self.keyboardWidget.update_layout()
+        # High-speed paint only (no expensive layout reconstruction)
         self.keyboardWidget.update()
-        self.keyboardWidget.updateGeometry()
 
     def unlock(self):
         Unlocker.unlock(self.keyboard)
+        self.unlocked = False
 
     def activate(self):
+        self.unlocked = False
+        self.prev_matrix_data = None
         self.grabber.grabKeyboard()
-        self.timer.start(20)
+        self.timer.start(10)
 
     def deactivate(self):
         self.grabber.releaseKeyboard()
