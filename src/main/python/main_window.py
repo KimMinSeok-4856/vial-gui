@@ -5,7 +5,7 @@ from json import JSONDecodeError
 
 from PyQt5.QtCore import Qt, QSettings, QStandardPaths, QTimer, QRect, QT_VERSION_STR
 from PyQt5.QtWidgets import QWidget, QComboBox, QToolButton, QHBoxLayout, QVBoxLayout, QMainWindow, QAction, qApp, \
-    QFileDialog, QDialog, QTabWidget, QActionGroup, QMessageBox, QLabel, QPushButton, QTextBrowser
+    QFileDialog, QDialog, QTabWidget, QActionGroup, QMessageBox, QLabel, QPushButton, QTextBrowser, QApplication, QInputDialog
 
 import os
 import sys
