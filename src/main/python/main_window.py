@@ -786,11 +786,11 @@ class MainWindow(QMainWindow):
             if res != QMessageBox.Yes:
                 return
 
-            # 1. Restore standard Vial layout
+            # 1. Restore standard Vial layout (keymap, combos, tap dance, overrides, macros, QMK settings)
             raw_vial_bytes = json.dumps(layout_data).encode("utf-8")
             dev.keyboard.restore_layout(raw_vial_bytes)
 
-            # 2. Restore Charybdis settings if present
+            # 2. Restore Charybdis settings if present (trackball DPI, auto mouse, layer RGB)
             if "charybdis_config" in layout_data:
                 cfg = layout_data["charybdis_config"]
                 self.charybdis_settings.slider_default_dpi.setValue(cfg.get("default_dpi", 800))
@@ -802,11 +802,14 @@ class MainWindow(QMainWindow):
                 if "1" in colors: self.charybdis_settings.layer_swatches[1].set_color(tuple(colors["1"]))
                 if "2" in colors: self.charybdis_settings.layer_swatches[2].set_color(tuple(colors["2"]))
                 if "3" in colors: self.charybdis_settings.layer_swatches[3].set_color(tuple(colors["3"]))
+                self.charybdis_settings.send_live_config(auto_save_delay=0)
                 self.charybdis_settings.save_to_eeprom()
 
-            # 3. Reload keyboard and UI
-            dev.keyboard.reload()
-            self.refresh_tabs()
+            # 3. Refresh all editors UI in-place (never call dev.keyboard.reload() which causes LZMA decompress errors)
+            current_tab = self.tabs.currentIndex()
+            self.rebuild()
+            if 0 <= current_tab < self.tabs.count():
+                self.tabs.setCurrentIndex(current_tab)
 
             QMessageBox.information(
                 self, "복원 완료",
