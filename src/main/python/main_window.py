@@ -344,7 +344,13 @@ class MainWindow(QMainWindow):
                     outf.write(self.keymap_editor.save_layout())
 
     def on_click_refresh(self):
-        self.autorefresh.update(quiet=False, hard=True)
+        self.btn_refresh_devices.setEnabled(False)
+        self.btn_refresh_devices.setText("새로고침 중...")
+        self.autorefresh.update_async(quiet=False, hard=True)
+        QTimer.singleShot(1000, lambda: [
+            self.btn_refresh_devices.setEnabled(True),
+            self.btn_refresh_devices.setText(tr("MainWindow", "Refresh"))
+        ])
 
     def on_devices_updated(self, devices, hard_refresh):
         self.combobox_devices.blockSignals(True)

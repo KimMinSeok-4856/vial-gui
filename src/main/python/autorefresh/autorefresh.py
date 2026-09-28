@@ -96,3 +96,9 @@ class Autorefresh(QObject):
 
     def update(self, quiet=True, hard=False):
         self.thread.update(quiet, hard)
+
+    def update_async(self, quiet=False, hard=True):
+        if hasattr(self.thread, "update_async"):
+            self.thread.update_async(quiet, hard)
+        else:
+            self.thread.update(quiet, hard)

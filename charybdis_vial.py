@@ -36,9 +36,21 @@ class DeviceAdapter:
             self._dev = None
         try:
             self._dev = hid.Device(path=path)
+            self._flush()
         except Exception as e:
             self._dev = None
             raise OSError(str(e))
+
+    def _flush(self):
+        if not self._dev:
+            return
+        try:
+            for _ in range(20):
+                d = self._dev.read(64, timeout=5)
+                if not d:
+                    break
+        except Exception:
+            pass
 
     def write(self, data):
         if not self._dev:

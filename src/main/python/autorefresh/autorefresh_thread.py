@@ -32,11 +32,19 @@ class AutorefreshThread(QThread):
         self.sideload_vid = self.sideload_pid = -1
         # create empty VIA definitions. Easier than setting it to none and handling a bunch of exceptions
         self.via_stack_json = {"definitions": {}}
+        self.need_update = False
+        self.force_hard = False
+        self.force_quiet = False
 
     def run(self):
         while True:
             self.update()
             time.sleep(1)
+
+    def update_async(self, quiet=False, hard=True):
+        self.force_hard = hard
+        self.force_quiet = quiet
+        self.need_update = True
 
     def lock(self):
         with self.mutex:

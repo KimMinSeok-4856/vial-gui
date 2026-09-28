@@ -72,32 +72,52 @@ class Keyboard(ProtocolMacro, ProtocolDynamic, ProtocolTapDance, ProtocolCombo, 
 
     def reload(self, sideload_json=None):
         """ Load information about the keyboard: number of layers, physical key layout """
+        from PyQt5.QtWidgets import QApplication
+        qapp = QApplication.instance()
+        def pump():
+            if qapp:
+                qapp.processEvents()
 
         self.rowcol = OrderedDict()
         self.encoderpos = OrderedDict()
         self.layout = dict()
         self.encoder_layout = dict()
 
+        pump()
         self.reload_layout(sideload_json)
+        pump()
         self.reload_layers()
+        pump()
 
         self.reload_macros_early()
+        pump()
         self.reload_persistent_rgb()
+        pump()
         self.reload_rgb()
+        pump()
         self.reload_settings()
+        pump()
 
         self.reload_dynamic()
+        pump()
 
         # based on the number of macros, tapdance, etc, this will generate global keycode arrays
         recreate_keyboard_keycodes(self)
+        pump()
 
         # at this stage we have correct keycode info and can reload everything that depends on keycodes
         self.reload_keymap()
+        pump()
         self.reload_macros_late()
+        pump()
         self.reload_tap_dance()
+        pump()
         self.reload_combo()
+        pump()
         self.reload_key_override()
+        pump()
         self.reload_alt_repeat_key()
+        pump()
 
     def reload_layers(self):
         """ Get how many layers the keyboard has """
@@ -286,12 +306,21 @@ class Keyboard(ProtocolMacro, ProtocolDynamic, ProtocolTapDance, ProtocolCombo, 
             self.lighting_vialrgb = self.definition["lighting"] == "vialrgb"
 
         if self.lighting_vialrgb:
-            data = self.usb_send(self.dev, struct.pack("BB", CMD_VIA_LIGHTING_GET_VALUE, VIALRGB_GET_INFO),
-                                 retries=20)[2:]
-            self.rgb_version = data[0] | (data[1] << 8)
+            # Try up to 3 times to get valid VialRGB info
+            for attempt in range(3):
+                data = self.usb_send(self.dev, struct.pack("BB", CMD_VIA_LIGHTING_GET_VALUE, VIALRGB_GET_INFO),
+                                     retries=20)[2:]
+                self.rgb_version = data[0] | (data[1] << 8)
+                if self.rgb_version == 1:
+                    break
+                time.sleep(0.1)
+
             if self.rgb_version != 1:
-                raise RuntimeError("Unsupported VialRGB protocol ({}), update your Vial version to latest"
-                                   .format(self.rgb_version))
+                import logging
+                logging.warning("VialRGB protocol unsupported or not ready (version {}), bypassing VialRGB".format(self.rgb_version))
+                self.lighting_vialrgb = False
+                return
+
             self.rgb_maximum_brightness = data[2]
 
             self.rgb_supported_effects = {0}
@@ -299,11 +328,14 @@ class Keyboard(ProtocolMacro, ProtocolDynamic, ProtocolTapDance, ProtocolCombo, 
             while max_effect < 0xFFFF:
                 data = self.usb_send(self.dev, struct.pack("<BBH", CMD_VIA_LIGHTING_GET_VALUE, VIALRGB_GET_SUPPORTED,
                                                            max_effect))[2:]
+                prev_max = max_effect
                 for x in range(0, len(data), 2):
                     value = int.from_bytes(data[x:x+2], byteorder="little")
                     if value != 0xFFFF:
                         self.rgb_supported_effects.add(value)
                     max_effect = max(max_effect, value)
+                if max_effect == prev_max:
+                    break
 
     def reload_rgb(self):
         if self.lighting_qmk_rgblight:
@@ -340,11 +372,14 @@ class Keyboard(ProtocolMacro, ProtocolDynamic, ProtocolTapDance, ProtocolCombo, 
         while cur != 0xFFFF:
             data = self.usb_send(self.dev, struct.pack("<BBH", CMD_VIA_VIAL_PREFIX, CMD_VIAL_QMK_SETTINGS_QUERY, cur),
                                  retries=20)
+            prev_cur = cur
             for x in range(0, len(data), 2):
                 qsid = int.from_bytes(data[x:x+2], byteorder="little")
                 cur = max(cur, qsid)
                 if qsid != 0xFFFF:
                     self.supported_settings.add(qsid)
+            if cur == prev_cur:
+                break
 
         for qsid in self.supported_settings:
             from editor.qmk_settings import QmkSettings

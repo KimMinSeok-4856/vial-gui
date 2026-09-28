@@ -44,7 +44,7 @@ class AutorefreshThreadWin(AutorefreshThread):
             except Exception:
                 pass
 
-            if g_device_changes > 0:
+            if g_device_changes > 0 or getattr(self, "need_update", False):
                 # Windows sends a burst of DBT_DEVICEARRIVAL messages as composite interfaces bind.
                 # Wait 300ms for drivers to finish binding and endpoints to stabilize.
                 time.sleep(0.3)
@@ -53,8 +53,13 @@ class AutorefreshThreadWin(AutorefreshThread):
                 except Exception:
                     pass
                 g_device_changes = 0
+                hard = getattr(self, "force_hard", False)
+                quiet = getattr(self, "force_quiet", True)
+                self.need_update = False
+                self.force_hard = False
+                self.force_quiet = False
                 try:
-                    self.update()
+                    self.update(quiet=quiet, hard=hard)
                 except Exception:
                     pass
 
