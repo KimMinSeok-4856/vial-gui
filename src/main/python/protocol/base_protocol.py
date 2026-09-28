@@ -14,14 +14,29 @@ class BaseProtocol:
     macro = b""
 
     def _retrieve_dynamic_entries(self, cmd, count, fmt):
+        import time
+        import logging
+
         out = []
+        sz = struct.calcsize(fmt)
         for x in range(count):
-            data = self.usb_send(
-                self.dev,
-                struct.pack("BBBB", CMD_VIA_VIAL_PREFIX, CMD_VIAL_DYNAMIC_ENTRY_OP, cmd, x),
-                retries=20
-            )
-            if data[0] != 0:
-                raise RuntimeError("failed retrieving dynamic={} entry {} from the device".format(cmd, x))
-            out.append(struct.unpack(fmt, data[1:1 + struct.calcsize(fmt)]))
+            entry_data = None
+            for attempt in range(3):
+                try:
+                    data = self.usb_send(
+                        self.dev,
+                        struct.pack("BBBB", CMD_VIA_VIAL_PREFIX, CMD_VIAL_DYNAMIC_ENTRY_OP, cmd, x),
+                        retries=3
+                    )
+                    if data and data[0] == 0:
+                        entry_data = struct.unpack(fmt, data[1:1 + sz])
+                        break
+                except Exception:
+                    pass
+                time.sleep(0.05)
+
+            if entry_data is None:
+                logging.warning("failed retrieving dynamic={} entry {} from the device, defaulting".format(cmd, x))
+                entry_data = struct.unpack(fmt, b"\x00" * sz)
+            out.append(entry_data)
         return out

@@ -397,7 +397,17 @@ class MainWindow(QMainWindow):
             self.autorefresh.current_device = None
             self.rebuild()
             self.refresh_tabs()
+            # If we haven't retried yet for this selection, retry once after 400ms to allow USB bus to settle
+            if not getattr(self, "_device_select_retrying", False):
+                self._device_select_retrying = True
+                QTimer.singleShot(400, self._retry_device_select)
             return
+
+    def _retry_device_select(self):
+        self._device_select_retrying = False
+        if self.combobox_devices.currentIndex() >= 0 and self.autorefresh.current_device is None:
+            logging.info("Auto-retrying device selection after transient error...")
+            self.on_device_selected()
 
         if isinstance(self.autorefresh.current_device, VialKeyboard):
             keyboard_id = self.autorefresh.current_device.keyboard.keyboard_id

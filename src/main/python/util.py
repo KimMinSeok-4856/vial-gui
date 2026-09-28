@@ -45,6 +45,15 @@ def hid_send(dev, msg, retries=1):
     data = b""
     first = True
 
+    # Purge any stale unread reports so subsequent reads never get shifted/out-of-sync
+    try:
+        while True:
+            stale = dev.read(MSG_LEN, timeout_ms=2)
+            if not stale:
+                break
+    except Exception:
+        pass
+
     while retries > 0:
         retries -= 1
         if not first:
@@ -52,7 +61,7 @@ def hid_send(dev, msg, retries=1):
             qapp = QApplication.instance()
             if qapp:
                 qapp.processEvents()
-            time.sleep(0.1)
+            time.sleep(0.05)
         first = False
         try:
             # add 00 at start for hidapi report id
