@@ -373,6 +373,9 @@ class MainWindow(QMainWindow):
         except ProtocolError:
             QMessageBox.warning(self, "", "Unsupported protocol version!\n"
                                           "Please download latest Vial from https://get.vial.today/")
+        except Exception as e:
+            logging.error(f"Error selecting device: {e}")
+            return
 
         if isinstance(self.autorefresh.current_device, VialKeyboard):
             keyboard_id = self.autorefresh.current_device.keyboard.keyboard_id

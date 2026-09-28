@@ -1,4 +1,5 @@
-# SPDX-License-Identifier: GPL-2.0-or-later
+import os
+import time
 import struct
 import json
 import lzma
@@ -125,23 +126,69 @@ class Keyboard(ProtocolMacro, ProtocolDynamic, ProtocolTapDance, ProtocolCombo, 
             data = self.usb_send(self.dev, struct.pack("BB", CMD_VIA_VIAL_PREFIX, CMD_VIAL_GET_KEYBOARD_ID), retries=20)
             self.vial_protocol, self.keyboard_id = struct.unpack("<IQ", data[0:12])
 
-            # get the size
-            data = self.usb_send(self.dev, struct.pack("BB", CMD_VIA_VIAL_PREFIX, CMD_VIAL_GET_SIZE), retries=20)
-            sz = struct.unpack("<I", data[0:4])[0]
+            payload = None
+            cache_dirs = [
+                os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "definitions_cache"),
+                r"C:\vial-gui\definitions_cache"
+            ]
+            cache_file = None
+            for cd in cache_dirs:
+                cf = os.path.join(cd, f"{self.keyboard_id}.json")
+                if os.path.exists(cf):
+                    cache_file = cf
+                    break
 
-            # get the payload
-            payload = b""
-            block = 0
-            while sz > 0:
-                data = self.usb_send(self.dev, struct.pack("<BBI", CMD_VIA_VIAL_PREFIX, CMD_VIAL_GET_DEFINITION, block),
-                                     retries=20)
-                if sz < MSG_LEN:
-                    data = data[:sz]
-                payload += data
-                block += 1
-                sz -= MSG_LEN
+            # 1. Attempt cached definition first if present
+            if cache_file and os.path.exists(cache_file):
+                try:
+                    with open(cache_file, "r", encoding="utf-8") as f:
+                        payload = json.load(f)
+                except Exception:
+                    payload = None
 
-            payload = json.loads(lzma.decompress(payload))
+            # 2. If not cached, fetch from keyboard over USB with retries
+            if payload is None:
+                last_err = None
+                for attempt in range(5):
+                    try:
+                        # get the size
+                        data = self.usb_send(self.dev, struct.pack("BB", CMD_VIA_VIAL_PREFIX, CMD_VIAL_GET_SIZE), retries=20)
+                        sz = struct.unpack("<I", data[0:4])[0]
+
+                        # get the payload
+                        raw_payload = b""
+                        block = 0
+                        while sz > 0:
+                            data = self.usb_send(self.dev, struct.pack("<BBI", CMD_VIA_VIAL_PREFIX, CMD_VIAL_GET_DEFINITION, block),
+                                                 retries=20)
+                            if sz < MSG_LEN:
+                                data = data[:sz]
+                            raw_payload += data
+                            block += 1
+                            sz -= MSG_LEN
+
+                        payload = json.loads(lzma.decompress(raw_payload))
+
+                        # Save to cache for future instant and reliable loads
+                        for cd in cache_dirs:
+                            try:
+                                os.makedirs(cd, exist_ok=True)
+                                with open(os.path.join(cd, f"{self.keyboard_id}.json"), "w", encoding="utf-8") as f:
+                                    json.dump(payload, f, indent=2)
+                                break
+                            except Exception:
+                                pass
+                        break
+                    except Exception as e:
+                        last_err = e
+                        time.sleep(0.1)
+
+                if payload is None:
+                    if cache_file and os.path.exists(cache_file):
+                        with open(cache_file, "r", encoding="utf-8") as f:
+                            payload = json.load(f)
+                    elif last_err:
+                        raise last_err
 
         self.check_protocol_version()
 
