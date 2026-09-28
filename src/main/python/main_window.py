@@ -93,6 +93,44 @@ class MainWindow(QMainWindow):
         self.btn_guide.clicked.connect(self.show_guide_dialog)
         layout_combobox.addWidget(self.btn_guide)
 
+        self.btn_git_backup = QPushButton("☁️ Git에 레이아웃 백업")
+        self.btn_git_backup.setFixedHeight(26)
+        self.btn_git_backup.setStyleSheet("""
+            QPushButton {
+                background-color: #238636;
+                color: white;
+                font-weight: bold;
+                font-size: 12px;
+                border-radius: 4px;
+                padding: 0 10px;
+                border: 1px solid #2ea043;
+            }
+            QPushButton:hover {
+                background-color: #2ea043;
+            }
+        """)
+        self.btn_git_backup.clicked.connect(self.on_git_backup)
+        layout_combobox.addWidget(self.btn_git_backup)
+
+        self.btn_git_restore = QPushButton("📥 Git에서 불러오기")
+        self.btn_git_restore.setFixedHeight(26)
+        self.btn_git_restore.setStyleSheet("""
+            QPushButton {
+                background-color: #30363d;
+                color: white;
+                font-weight: bold;
+                font-size: 12px;
+                border-radius: 4px;
+                padding: 0 10px;
+                border: 1px solid #8b949e;
+            }
+            QPushButton:hover {
+                background-color: #484f58;
+            }
+        """)
+        self.btn_git_restore.clicked.connect(self.on_git_restore)
+        layout_combobox.addWidget(self.btn_git_restore)
+
         self.layout_editor = LayoutEditor()
         self.keymap_editor = KeymapEditor(self.layout_editor)
         self.firmware_flasher = FirmwareFlasher(self)
@@ -631,6 +669,151 @@ class MainWindow(QMainWindow):
         self.about_dialog = AboutKeyboard(self.autorefresh.current_device)
         self.about_dialog.setModal(True)
         self.about_dialog.show()
+
+    def on_git_backup(self):
+        dev = self.autorefresh.current_device
+        if not dev or not getattr(dev, "keyboard", None):
+            QMessageBox.warning(self, "백업 실패", "연결된 Charybdis 키보드가 없습니다. 키보드를 연결 후 시도하세요.")
+            return
+
+        try:
+            import json, subprocess, datetime, os
+            base_dir = r"C:\vial-gui"
+            saved_dir = os.path.join(base_dir, "saved_layouts")
+            os.makedirs(saved_dir, exist_ok=True)
+
+            # 1. Capture current layout
+            raw_layout = self.keymap_editor.save_layout()
+            layout_data = json.loads(raw_layout.decode("utf-8"))
+
+            # 2. Add Charybdis trackball & RGB configuration
+            charybdis_cfg = {
+                "default_dpi": self.charybdis_settings.slider_default_dpi.value(),
+                "sniping_dpi": self.charybdis_settings.slider_sniping_dpi.value(),
+                "auto_mouse_enable": self.charybdis_settings.chk_auto_mouse.isChecked(),
+                "auto_mouse_time": self.charybdis_settings.slider_auto_mouse_time.value(),
+                "scroll_invert_y": self.charybdis_settings.chk_rev_y.isChecked(),
+                "layer_colors": {
+                    "1": self.charybdis_settings.layer_swatches[1].current_rgb,
+                    "2": self.charybdis_settings.layer_swatches[2].current_rgb,
+                    "3": self.charybdis_settings.layer_swatches[3].current_rgb,
+                }
+            }
+            layout_data["charybdis_config"] = charybdis_cfg
+
+            now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            now_file_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            layout_data["backup_timestamp"] = now_str
+
+            # 3. Write files
+            latest_path = os.path.join(saved_dir, "charybdis_layout_latest.json")
+            history_path = os.path.join(saved_dir, f"charybdis_layout_{now_file_str}.json")
+
+            json_text = json.dumps(layout_data, indent=2, ensure_ascii=False)
+            with open(latest_path, "w", encoding="utf-8") as f:
+                f.write(json_text)
+            with open(history_path, "w", encoding="utf-8") as f:
+                f.write(json_text)
+
+            # Also backup into QMK firmware repo if present
+            qmk_backup_dir = r"C:\qmk_firmware\saved_layouts"
+            try:
+                os.makedirs(qmk_backup_dir, exist_ok=True)
+                with open(os.path.join(qmk_backup_dir, "charybdis_layout_latest.json"), "w", encoding="utf-8") as f:
+                    f.write(json_text)
+            except Exception:
+                pass
+
+            # 4. Git add, commit, push
+            subprocess.run(["git", "add", "saved_layouts/"], cwd=base_dir, check=True)
+            commit_msg = f"backup(layout): save Charybdis layout ({now_str})"
+            subprocess.run(["git", "commit", "-m", commit_msg], cwd=base_dir)
+            proc = subprocess.run(["git", "push", "origin", "feature/minseok-charybdis-vial"],
+                                  cwd=base_dir, capture_output=True, text=True)
+
+            if proc.returncode == 0:
+                QMessageBox.information(
+                    self, "GitHub 백업 완료",
+                    f"🎉 현재 키보드 레이아웃이 GitHub에 성공적으로 백업되었습니다!\n\n"
+                    f"• 저장소: KimMinSeok-4856/vial-gui\n"
+                    f"• 브랜치: feature/minseok-charybdis-vial\n"
+                    f"• 백업 파일: saved_layouts/charybdis_layout_latest.json\n"
+                    f"• 백업 일시: {now_str}\n\n"
+                    f"모든 레이어(0~3), 탭댄스, 콤보, 키 오버라이드, 매크로 및 트랙볼/RGB 설정이 모두 안전하게 저장되었습니다."
+                )
+            else:
+                QMessageBox.warning(
+                    self, "GitHub 푸시 경고",
+                    f"로컬 파일(saved_layouts/) 저장은 완료되었으나, GitHub 푸시 중 메시지가 발생했습니다:\n{proc.stderr}\n{proc.stdout}"
+                )
+        except Exception as e:
+            QMessageBox.critical(self, "백업 오류", f"레이아웃 백업 중 오류가 발생했습니다:\n{e}")
+
+    def on_git_restore(self):
+        dev = self.autorefresh.current_device
+        if not dev or not getattr(dev, "keyboard", None):
+            QMessageBox.warning(self, "복원 실패", "연결된 Charybdis 키보드가 없습니다. 키보드를 연결 후 시도하세요.")
+            return
+
+        import json, subprocess, os
+        base_dir = r"C:\vial-gui"
+        latest_path = os.path.join(base_dir, "saved_layouts", "charybdis_layout_latest.json")
+
+        # Try to pull latest from GitHub first
+        try:
+            subprocess.run(["git", "pull", "origin", "feature/minseok-charybdis-vial"],
+                           cwd=base_dir, capture_output=True, text=True)
+        except Exception:
+            pass
+
+        if not os.path.exists(latest_path):
+            QMessageBox.warning(self, "복원 파일 없음", "GitHub에 저장된 레이아웃 백업 파일(charybdis_layout_latest.json)이 없습니다.\n먼저 'Git에 레이아웃 백업'을 실행하세요.")
+            return
+
+        try:
+            with open(latest_path, "r", encoding="utf-8") as f:
+                layout_data = json.load(f)
+
+            backup_time = layout_data.get("backup_timestamp", "알 수 없음")
+            res = QMessageBox.question(
+                self, "GitHub 레이아웃 복원",
+                f"GitHub에 백업된 최신 레이아웃을 키보드에 복원하시겠습니까?\n\n"
+                f"• 백업 일시: {backup_time}\n"
+                f"• 복원 대상: 키맵(0~3 레이어), 탭댄스, 콤보, 키 오버라이드, 매크로, 트랙볼 감도 & RGB\n\n"
+                f"복원 시 현재 키보드의 설정이 백업 시점의 상태로 덮어쓰기됩니다.",
+                QMessageBox.Yes | QMessageBox.No
+            )
+            if res != QMessageBox.Yes:
+                return
+
+            # 1. Restore standard Vial layout
+            raw_vial_bytes = json.dumps(layout_data).encode("utf-8")
+            dev.keyboard.restore_layout(raw_vial_bytes)
+
+            # 2. Restore Charybdis settings if present
+            if "charybdis_config" in layout_data:
+                cfg = layout_data["charybdis_config"]
+                self.charybdis_settings.slider_default_dpi.setValue(cfg.get("default_dpi", 800))
+                self.charybdis_settings.slider_sniping_dpi.setValue(cfg.get("sniping_dpi", 200))
+                self.charybdis_settings.chk_auto_mouse.setChecked(cfg.get("auto_mouse_enable", True))
+                self.charybdis_settings.slider_auto_mouse_time.setValue(cfg.get("auto_mouse_time", 650))
+                self.charybdis_settings.chk_rev_y.setChecked(cfg.get("scroll_invert_y", True))
+                colors = cfg.get("layer_colors", {})
+                if "1" in colors: self.charybdis_settings.layer_swatches[1].set_color(tuple(colors["1"]))
+                if "2" in colors: self.charybdis_settings.layer_swatches[2].set_color(tuple(colors["2"]))
+                if "3" in colors: self.charybdis_settings.layer_swatches[3].set_color(tuple(colors["3"]))
+                self.charybdis_settings.save_to_eeprom()
+
+            # 3. Reload keyboard and UI
+            dev.keyboard.reload()
+            self.refresh_tabs()
+
+            QMessageBox.information(
+                self, "복원 완료",
+                "🎉 GitHub의 최신 레이아웃이 키보드에 성공적으로 복원 및 영구 저장되었습니다!"
+            )
+        except Exception as e:
+            QMessageBox.critical(self, "복원 오류", f"레이아웃 복원 중 오류가 발생했습니다:\n{e}")
 
     def closeEvent(self, e):
         self.settings.setValue("size", self.size())
