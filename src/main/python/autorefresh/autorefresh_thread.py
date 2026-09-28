@@ -9,7 +9,7 @@ if sys.platform == "emscripten":
         def __exit__(self, *args):
             pass
 else:
-    from multiprocessing import RLock
+    from threading import RLock
 
 from PyQt5.QtCore import pyqtSignal, QThread
 
@@ -77,8 +77,9 @@ class AutorefreshThread(QThread):
             old_path = "blank"
             if self.current_device is not None:
                 old_path = self.current_device.desc["path"]
+            should_hard = (old_path not in new_paths) or hard
 
-            self.devices_updated.emit(new_devices, (old_path not in new_paths) or hard)
+        self.devices_updated.emit(new_devices, should_hard)
 
     def load_dummy(self, data):
         with self.mutex:

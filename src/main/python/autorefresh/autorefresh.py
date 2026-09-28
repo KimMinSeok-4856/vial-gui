@@ -68,18 +68,26 @@ class Autorefresh(QObject):
 
     def select_device(self, idx):
         if self.current_device is not None:
-            self.current_device.close()
+            try:
+                self.current_device.close()
+            except Exception:
+                pass
         self.current_device = None
-        if idx >= 0:
+        if 0 <= idx < len(self.devices):
             self.current_device = self.devices[idx]
 
         if self.current_device is not None:
-            if self.current_device.sideload:
-                self.current_device.open(self.thread.sideload_json)
-            elif self.current_device.via_stack:
-                self.current_device.open(self.thread.via_stack_json["definitions"][self.current_device.via_id])
-            else:
-                self.current_device.open(None)
+            try:
+                if self.current_device.sideload:
+                    self.current_device.open(self.thread.sideload_json)
+                elif self.current_device.via_stack:
+                    self.current_device.open(self.thread.via_stack_json["definitions"][self.current_device.via_id])
+                else:
+                    self.current_device.open(None)
+            except Exception:
+                self.current_device = None
+                self.thread.set_device(None)
+                raise
         self.thread.set_device(self.current_device)
 
     def on_devices_updated(self, devices, changed):

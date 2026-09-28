@@ -365,16 +365,32 @@ class MainWindow(QMainWindow):
             self.tabs.hide()
 
         if hard_refresh:
-            self.on_device_selected()
+            if devices:
+                # Give Windows USB stack 250ms to finish driver binding before opening endpoints
+                QTimer.singleShot(250, self.on_device_selected)
+            else:
+                self.on_device_selected()
 
     def on_device_selected(self):
+        idx = self.combobox_devices.currentIndex()
+        if idx < 0:
+            self.autorefresh.select_device(-1)
+            self.rebuild()
+            self.refresh_tabs()
+            return
+
         try:
-            self.autorefresh.select_device(self.combobox_devices.currentIndex())
+            self.autorefresh.select_device(idx)
         except ProtocolError:
             QMessageBox.warning(self, "", "Unsupported protocol version!\n"
                                           "Please download latest Vial from https://get.vial.today/")
+            return
         except Exception as e:
-            logging.error(f"Error selecting device: {e}")
+            import traceback
+            logging.error(f"Error selecting device: {e}\n{traceback.format_exc()}")
+            self.autorefresh.current_device = None
+            self.rebuild()
+            self.refresh_tabs()
             return
 
         if isinstance(self.autorefresh.current_device, VialKeyboard):

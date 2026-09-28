@@ -28,19 +28,42 @@ class DeviceAdapter:
         self._dev = None
 
     def open_path(self, path):
-        self._dev = hid.Device(path=path)
+        if self._dev:
+            try:
+                self._dev.close()
+            except Exception:
+                pass
+            self._dev = None
+        try:
+            self._dev = hid.Device(path=path)
+        except Exception as e:
+            self._dev = None
+            raise OSError(str(e))
 
     def write(self, data):
-        return self._dev.write(bytes(data))
+        if not self._dev:
+            raise OSError("Device not open")
+        try:
+            return self._dev.write(bytes(data))
+        except Exception as e:
+            raise OSError(str(e))
 
     def read(self, max_length, timeout_ms=None):
-        if timeout_ms is not None:
-            return list(self._dev.read(max_length, timeout=timeout_ms))
-        return list(self._dev.read(max_length))
+        if not self._dev:
+            raise OSError("Device not open")
+        try:
+            if timeout_ms is not None:
+                return list(self._dev.read(max_length, timeout=timeout_ms))
+            return list(self._dev.read(max_length, timeout=1000))
+        except Exception as e:
+            raise OSError(str(e))
 
     def close(self):
         if self._dev:
-            self._dev.close()
+            try:
+                self._dev.close()
+            except Exception:
+                pass
             self._dev = None
 
 hid.device = DeviceAdapter

@@ -273,9 +273,9 @@ class CharybdisEditor(BasicEditor):
         try:
             msg = [0xFC, 0x01] + [0x00] * 30
             self.device.send(bytes(msg))
-            resp = list(self.device.recv(32))
+            resp = list(self.device.recv(32, timeout_ms=500))
 
-            if resp[0] == 0xFC and resp[1] == 0x01:
+            if len(resp) >= 21 and resp[0] == 0xFC and resp[1] == 0x01:
                 default_dpi = (resp[2] << 8) | resp[3]
                 sniping_dpi = (resp[4] << 8) | resp[5]
                 auto_mouse_en = resp[6]
@@ -349,7 +349,7 @@ class CharybdisEditor(BasicEditor):
             ]
             pkt += [0] * (32 - len(pkt))
             self.device.send(bytes(pkt))
-            self.device.recv(32)
+            self.device.recv(32, timeout_ms=500)
 
             # Auto-save trigger
             if getattr(self, "chk_auto_save", None) is None or self.chk_auto_save.isChecked():
@@ -368,7 +368,7 @@ class CharybdisEditor(BasicEditor):
             self.auto_save_timer.stop()
             msg = [0xFC, 0x03] + [0x00] * 30
             self.device.send(bytes(msg))
-            self.device.recv(32)
+            self.device.recv(32, timeout_ms=500)
             self.set_status("⚡ 키보드(EEPROM)에 실시간 자동 저장 완료!")
         except Exception as e:
             self.set_status(f"자동 저장 오류: {e}")

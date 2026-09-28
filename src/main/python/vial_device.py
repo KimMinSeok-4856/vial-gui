@@ -21,8 +21,12 @@ class VialDevice:
             try:
                 self.dev.open_path(self.desc["path"])
                 return
-            except OSError:
-                time.sleep(1)
+            except (OSError, Exception):
+                from PyQt5.QtWidgets import QApplication
+                qapp = QApplication.instance()
+                if qapp:
+                    qapp.processEvents()
+                time.sleep(0.2)
         raise RuntimeError("unable to open the device")
 
     def send(self, data):
@@ -33,7 +37,12 @@ class VialDevice:
         return bytes(self.dev.read(length, timeout_ms=timeout_ms))
 
     def close(self):
-        self.dev.close()
+        if self.dev is not None:
+            try:
+                self.dev.close()
+            except Exception:
+                pass
+            self.dev = None
 
 
 class VialKeyboard(VialDevice):

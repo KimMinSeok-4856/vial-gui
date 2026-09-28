@@ -39,10 +39,23 @@ class AutorefreshThreadWin(AutorefreshThread):
         )
 
         while True:
-            for x in range(100):
+            try:
                 win32gui.PumpWaitingMessages()
-                time.sleep(0.01)
+            except Exception:
+                pass
 
             if g_device_changes > 0:
+                # Windows sends a burst of DBT_DEVICEARRIVAL messages as composite interfaces bind.
+                # Wait 300ms for drivers to finish binding and endpoints to stabilize.
+                time.sleep(0.3)
+                try:
+                    win32gui.PumpWaitingMessages()
+                except Exception:
+                    pass
                 g_device_changes = 0
-                self.update()
+                try:
+                    self.update()
+                except Exception:
+                    pass
+
+            time.sleep(0.05)
