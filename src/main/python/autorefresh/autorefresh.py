@@ -33,9 +33,12 @@ class Autorefresh(QObject):
 
             self.thread = AutorefreshThreadWeb()
         elif sys.platform.startswith("win"):
-            from autorefresh.autorefresh_thread_win import AutorefreshThreadWin
-
-            self.thread = AutorefreshThreadWin()
+            try:
+                from autorefresh.autorefresh_thread_win import AutorefreshThreadWin
+                self.thread = AutorefreshThreadWin()
+            except ImportError:
+                from autorefresh.autorefresh_thread import AutorefreshThread
+                self.thread = AutorefreshThread()
         else:
             from autorefresh.autorefresh_thread import AutorefreshThread
 
