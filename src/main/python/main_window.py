@@ -361,6 +361,9 @@ class MainWindow(QMainWindow):
             if self.autorefresh.current_device and dev.desc["path"] == self.autorefresh.current_device.desc["path"]:
                 self.combobox_devices.setCurrentIndex(self.combobox_devices.count() - 1)
 
+        if devices and self.combobox_devices.currentIndex() < 0:
+            self.combobox_devices.setCurrentIndex(0)
+
         self.combobox_devices.blockSignals(False)
 
         if devices:
@@ -370,7 +373,10 @@ class MainWindow(QMainWindow):
             self.lbl_no_devices.show()
             self.tabs.hide()
 
-        if hard_refresh:
+        self.btn_refresh_devices.setEnabled(True)
+        self.btn_refresh_devices.setText(tr("MainWindow", "Refresh"))
+
+        if hard_refresh or (devices and self.autorefresh.current_device is None):
             if devices:
                 # Give Windows USB stack 250ms to finish driver binding before opening endpoints
                 QTimer.singleShot(250, self.on_device_selected)
@@ -403,11 +409,7 @@ class MainWindow(QMainWindow):
                 QTimer.singleShot(400, self._retry_device_select)
             return
 
-    def _retry_device_select(self):
         self._device_select_retrying = False
-        if self.combobox_devices.currentIndex() >= 0 and self.autorefresh.current_device is None:
-            logging.info("Auto-retrying device selection after transient error...")
-            self.on_device_selected()
 
         if isinstance(self.autorefresh.current_device, VialKeyboard):
             keyboard_id = self.autorefresh.current_device.keyboard.keyboard_id
@@ -417,6 +419,12 @@ class MainWindow(QMainWindow):
 
         self.rebuild()
         self.refresh_tabs()
+
+    def _retry_device_select(self):
+        self._device_select_retrying = False
+        if self.combobox_devices.currentIndex() >= 0 and self.autorefresh.current_device is None:
+            logging.info("Auto-retrying device selection after transient error...")
+            self.on_device_selected()
 
     def rebuild(self):
         # don't show "Security" menu for bootloader mode, as the bootloader is inherently insecure
