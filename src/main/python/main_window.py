@@ -5,7 +5,7 @@ from json import JSONDecodeError
 
 from PyQt5.QtCore import Qt, QSettings, QStandardPaths, QTimer, QRect, QT_VERSION_STR
 from PyQt5.QtWidgets import QWidget, QComboBox, QToolButton, QHBoxLayout, QVBoxLayout, QMainWindow, QAction, qApp, \
-    QFileDialog, QDialog, QTabWidget, QActionGroup, QMessageBox, QLabel
+    QFileDialog, QDialog, QTabWidget, QActionGroup, QMessageBox, QLabel, QPushButton, QTextBrowser
 
 import os
 import sys
@@ -73,6 +73,25 @@ class MainWindow(QMainWindow):
         layout_combobox.addWidget(self.combobox_devices)
         if sys.platform != "emscripten":
             layout_combobox.addWidget(self.btn_refresh_devices)
+
+        self.btn_guide = QPushButton("📖 탭별 기능 가이드 & 예시")
+        self.btn_guide.setFixedHeight(26)
+        self.btn_guide.setStyleSheet("""
+            QPushButton {
+                background-color: #1f6feb;
+                color: white;
+                font-weight: bold;
+                font-size: 12px;
+                border-radius: 4px;
+                padding: 0 10px;
+                border: 1px solid #388bfd;
+            }
+            QPushButton:hover {
+                background-color: #388bfd;
+            }
+        """)
+        self.btn_guide.clicked.connect(self.show_guide_dialog)
+        layout_combobox.addWidget(self.btn_guide)
 
         self.layout_editor = LayoutEditor()
         self.keymap_editor = KeymapEditor(self.layout_editor)
@@ -345,6 +364,21 @@ class MainWindow(QMainWindow):
                   self.qmk_settings, self.matrix_tester, self.rgb_configurator, self.charybdis_settings]:
             e.rebuild(self.autorefresh.current_device)
 
+    TAB_NAMES = {
+        "Keymap": ("⌨️ 키맵 (Keymap)", "기본 레이어 0~3의 모든 키 배치를 클릭하여 자유롭게 변경합니다."),
+        "Layout": ("📐 레이아웃 (Layout)", "물리적 키보드 레이아웃 형상을 확인합니다."),
+        "Charybdis": ("✨ Charybdis 설정", "레이어별 RGB 색상, 트랙볼 DPI 감도, 오토마우스를 설정하고 실시간 자동 저장합니다."),
+        "Macros": ("⚡ 매크로 (Macros)", "한 번의 키 입력으로 긴 문자열이나 일련의 단축키 조합을 자동 타이핑합니다."),
+        "Lighting": ("💡 전체 조명 (Lighting)", "전체 RGB 밝기, 조명 효과 모드, 기본 색상을 설정합니다."),
+        "Tap Dance": ("💃 탭 댄스 (Tap Dance)", "키를 한 번 누를 때, 두 번 연타할 때, 길게 누를 때 각각 다른 동작을 수행하게 합니다."),
+        "Combos": ("🧩 콤보 (Combos)", "두 개 이상의 키를 동시에 눌렀을 때 특정 키나 특수 기능을 발동합니다."),
+        "Key Overrides": ("🔄 키 오버라이드 (Overrides)", "특정 조합(예: Shift + Backspace)을 다른 키(예: Delete)로 가로채어 변경합니다."),
+        "Alt Repeat Key": ("🔁 키 반복 (Alt Repeat)", "이전에 누른 키를 반복하거나 특정 대체 키를 출력합니다."),
+        "QMK Settings": ("⚙️ QMK 고급설정 (Settings)", "디바운스, 탭 홀드 시간, 자동 마우스 레이어 등 QMK 내부 변수를 조절합니다."),
+        "Matrix tester": ("🧪 키 입력 테스트 (Tester)", "키보드의 각 스위치와 트랙볼이 정상적으로 입력되는지 시각적으로 테스트합니다."),
+        "Firmware updater": ("🚀 펌웨어 업데이트 (Updater)", "부트로더 진입 및 펌웨어 업데이트를 수행합니다."),
+    }
+
     def refresh_tabs(self):
         self.tabs.clear()
         for container, lbl in self.editors:
@@ -352,7 +386,142 @@ class MainWindow(QMainWindow):
                 continue
 
             c = EditorContainer(container)
-            self.tabs.addTab(c, tr("MainWindow", lbl))
+            display_title, tooltip = self.TAB_NAMES.get(lbl, (lbl, ""))
+            idx = self.tabs.addTab(c, display_title)
+            if tooltip:
+                self.tabs.setTabToolTip(idx, tooltip)
+
+    def show_guide_dialog(self):
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Charybdis Vial 탭별 기능 가이드 & 활용 예시")
+        dialog.resize(800, 650)
+        d_layout = QVBoxLayout(dialog)
+
+        browser = QTextBrowser()
+        browser.setOpenExternalLinks(True)
+        guide_html = """
+        <div style="font-family: 'Segoe UI', Malgun Gothic, sans-serif; font-size: 13px; line-height: 1.6; color: #e6edf3; background-color: #0d1117; padding: 12px;">
+            <h1 style="color: #58a6ff; font-size: 20px; border-bottom: 2px solid #30363d; padding-bottom: 8px;">📖 Charybdis Vial 탭별 상세 가이드 & 활용 예시</h1>
+            <p style="color: #8b949e;">각 탭의 역할과 미니멀 3x6 스플릿 인체공학 키보드에서 200% 활용할 수 있는 실전 예시 안내입니다.</p>
+
+            <h2 style="color: #79c0ff; font-size: 16px; margin-top: 20px;">⌨️ 1. 키맵 (Keymap)</h2>
+            <p><b>역할:</b> 레이어 0부터 레이어 3까지 각 스위치를 눌렀을 때 입력될 키코드를 자유롭게 변경합니다.</p>
+            <div style="background-color: #161b22; border-left: 3px solid #58a6ff; padding: 8px 12px; margin-bottom: 12px; border-radius: 4px;">
+                <b>💡 활용 예시:</b>
+                <ul>
+                    <li>엄지 클러스터 키에 <code>MO(1)</code>(누르는 동안 Layer 1 임시 이동), <code>TG(2)</code>(Layer 2 토글)를 지정하여 작은 키 개수로도 108키 풀배열의 모든 기능을 사용합니다.</li>
+                    <li>Charybdis 전용 키코드인 <code>DRAG</code>(드래그 스크롤), <code>SNIPE</code>(스나이퍼 감도), <code>DPI+</code>, <code>DPI-</code>를 엄지 키에 배치하여 마우스 없이 손가락 하나로 모든 조작을 완성합니다.</li>
+                </ul>
+            </div>
+
+            <h2 style="color: #79c0ff; font-size: 16px; margin-top: 20px;">✨ 2. Charybdis 설정</h2>
+            <p><b>역할:</b> 카립디스 내장 트랙볼 감도와 레이어별 독립 RGB 색상을 제어합니다. 조절 즉시 키보드 메모리(EEPROM)에 자동 영구 저장됩니다.</p>
+            <div style="background-color: #161b22; border-left: 3px solid #3fb950; padding: 8px 12px; margin-bottom: 12px; border-radius: 4px;">
+                <b>💡 활용 예시:</b>
+                <ul>
+                    <li><b>레이어별 색상:</b> Layer 1(기능키) = 파랑, Layer 2(숫자패드) = 보라, Layer 3(마우스 모드) = 초록으로 지정하여 현재 어떤 레이어에 있는지 눈으로 직관적 확인.</li>
+                    <li><b>스마트 감도 조절:</b> 평상시 웹서핑 시 Default DPI 800, 포토샵 누끼따기/정밀 그래픽 작업 시 Sniping DPI 200으로 설정.</li>
+                </ul>
+            </div>
+
+            <h2 style="color: #79c0ff; font-size: 16px; margin-top: 20px;">⚡ 3. 매크로 (Macros)</h2>
+            <p><b>역할:</b> 단 한 번의 키 입력으로 긴 문장이나 연속된 단축키 시퀀스를 자동으로 타이핑합니다.</p>
+            <div style="background-color: #161b22; border-left: 3px solid #d29922; padding: 8px 12px; margin-bottom: 12px; border-radius: 4px;">
+                <b>💡 활용 예시:</b>
+                <ul>
+                    <li>자주 쓰는 본인 이메일 주소나 로그인 아이디를 매크로 <code>M0</code>에 등록하고 특정 키에 할당하여 1초 만에 자동 완성.</li>
+                    <li>개발 작업 시 자주 쓰는 깃 명령어 <code>git status && git pull</code> 또는 디렉터리 경로를 단축키 하나로 실행.</li>
+                </ul>
+            </div>
+
+            <h2 style="color: #79c0ff; font-size: 16px; margin-top: 20px;">💡 4. 전체 조명 (Lighting)</h2>
+            <p><b>역할:</b> QMK 내장 RGB Matrix 효과를 설정합니다. 전체 밝기, 애니메이션 효과, 속도를 제어합니다.</p>
+            <div style="background-color: #161b22; border-left: 3px solid #f0883e; padding: 8px 12px; margin-bottom: 12px; border-radius: 4px;">
+                <b>💡 활용 예시:</b>
+                <ul>
+                    <li>야간 작업 시 눈부심을 줄이기 위해 밝기를 낮추거나, 무지개(Rainbow) 및 브리딩(Breathing) 등 취향에 맞는 조명 효과 선택.</li>
+                </ul>
+            </div>
+
+            <h2 style="color: #79c0ff; font-size: 16px; margin-top: 20px;">💃 5. 탭 댄스 (Tap Dance)</h2>
+            <p><b>역할:</b> 같은 스위치 하나로 "1번 누름", "2번 연속 탭", "길게 누름(Hold)", "탭 후 길게 누름"에 각각 완전히 다른 4가지 동작을 할당합니다.</p>
+            <div style="background-color: #161b22; border-left: 3px solid #a371f7; padding: 8px 12px; margin-bottom: 12px; border-radius: 4px;">
+                <b>💡 활용 예시:</b>
+                <ul>
+                    <li><b>스페이스바 탭댄스:</b> 가볍게 1번 탭하면 <code>Space</code>(공백), 길게 꾹 누르고 있으면 <code>한/영 전환</code> 또는 <code>Shift</code>로 작동!</li>
+                    <li><b>세미콜론 탭댄스:</b> 1번 탭 = <code>;</code> (세미콜론), 2번 연속 탭 = <code>:</code> (콜론), 길게 누르면 <code>Enter</code> 입력.</li>
+                </ul>
+            </div>
+
+            <h2 style="color: #79c0ff; font-size: 16px; margin-top: 20px;">🧩 6. 콤보 (Combos)</h2>
+            <p><b>역할:</b> 두 개 이상의 키를 "동시에" 딱 눌렀을 때 특정 키나 특수 기능을 발동합니다.</p>
+            <div style="background-color: #161b22; border-left: 3px solid #58a6ff; padding: 8px 12px; margin-bottom: 12px; border-radius: 4px;">
+                <b>💡 활용 예시:</b>
+                <ul>
+                    <li><code>Q</code> + <code>W</code>를 동시에 누르면 <code>ESC</code>가 입력되도록 설정 (ESC를 누르려고 새끼손가락을 멀리 뻗지 않아도 됨).</li>
+                    <li><code>J</code> + <code>K</code>를 동시에 누르면 <code>Enter</code>가 입력되도록 설정 (홈로우를 벗어나지 않고 타이핑 지속).</li>
+                </ul>
+            </div>
+
+            <h2 style="color: #79c0ff; font-size: 16px; margin-top: 20px;">🔄 7. 키 오버라이드 (Key Overrides)</h2>
+            <p><b>역할:</b> 특정 보조키(Shift 등)와 함께 눌렸을 때 기본 출력을 가로채어 완전히 다른 키로 치환합니다.</p>
+            <div style="background-color: #161b22; border-left: 3px solid #3fb950; padding: 8px 12px; margin-bottom: 12px; border-radius: 4px;">
+                <b>💡 활용 예시:</b>
+                <ul>
+                    <li><code>Shift</code> + <code>Backspace</code>를 누르면 <code>Delete</code>가 입력되도록 설정 (별도의 Delete 키 자리를 만들 필요가 없어짐).</li>
+                    <li><code>Shift</code> + <code>1</code>을 누르면 <code>!</code> 대신 다른 특수기호가 나오도록 커스텀.</li>
+                </ul>
+            </div>
+
+            <h2 style="color: #79c0ff; font-size: 16px; margin-top: 20px;">🔁 8. 키 반복 (Alt Repeat Key)</h2>
+            <p><b>역할:</b> 방금 직전에 입력한 키를 한 번 더 반복하거나, 특정 키 뒤에 올 때 다른 키로 교체 입력합니다.</p>
+            <div style="background-color: #161b22; border-left: 3px solid #d29922; padding: 8px 12px; margin-bottom: 12px; border-radius: 4px;">
+                <b>💡 활용 예시:</b>
+                <ul>
+                    <li>반복 타이핑(예: <code>..</code> 또는 <code>--</code>) 시 같은 손가락을 연타하지 않고 다른 편한 손가락의 반복 키를 눌러 피로도 절감.</li>
+                </ul>
+            </div>
+
+            <h2 style="color: #79c0ff; font-size: 16px; margin-top: 20px;">⚙️ 9. QMK 고급설정 (QMK Settings)</h2>
+            <p><b>역할:</b> 펌웨어 재컴파일 없이 디바운스, 탭 홀드 판정 시간, 오토마우스 지연 등 QMK 내부 코어 파라미터를 조절합니다.</p>
+            <div style="background-color: #161b22; border-left: 3px solid #f0883e; padding: 8px 12px; margin-bottom: 12px; border-radius: 4px;">
+                <b>💡 활용 예시:</b>
+                <ul>
+                    <li>탭댄스 판정 시간(<code>Tapping Term</code>)이 너무 길거나 짧다고 느껴질 때 기본 200ms를 175ms 등으로 본인의 타건 속도에 맞춰 미세 조정.</li>
+                </ul>
+            </div>
+
+            <h2 style="color: #79c0ff; font-size: 16px; margin-top: 20px;">🧪 10. 키 입력 테스트 (Matrix Tester)</h2>
+            <p><b>역할:</b> 키보드의 모든 스위치를 눌렀을 때 PC에 키 신호가 정상 전달되는지 실시간 그래픽 매트릭스로 확인합니다.</p>
+            <div style="background-color: #161b22; border-left: 3px solid #a371f7; padding: 8px 12px; margin-bottom: 12px; border-radius: 4px;">
+                <b>💡 활용 예시:</b>
+                <ul>
+                    <li>키보드 스위치 교체(핫스왑) 후 접점 핀이 휘었거나 인식이 안 되는 스위치가 있는지 즉시 진단.</li>
+                </ul>
+            </div>
+        </div>
+        """
+        browser.setHtml(guide_html)
+        d_layout.addWidget(browser)
+
+        btn_close = QPushButton("확인 및 닫기")
+        btn_close.setFixedHeight(34)
+        btn_close.setStyleSheet("""
+            QPushButton {
+                background-color: #238636;
+                color: white;
+                font-weight: bold;
+                font-size: 13px;
+                border-radius: 6px;
+            }
+            QPushButton:hover {
+                background-color: #2ea043;
+            }
+        """)
+        btn_close.clicked.connect(dialog.accept)
+        d_layout.addWidget(btn_close)
+
+        dialog.exec_()
 
     def load_via_stack_json(self):
         from urllib.request import urlopen
