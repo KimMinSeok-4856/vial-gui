@@ -679,12 +679,28 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "백업 실패", "연결된 Charybdis 키보드가 없습니다. 키보드를 연결 후 시도하세요.")
             return
 
-        try:
-            import json, subprocess, datetime, os
-            base_dir = r"C:\vial-gui"
-            saved_dir = os.path.join(base_dir, "saved_layouts")
-            os.makedirs(saved_dir, exist_ok=True)
+        import json, subprocess, datetime, os
+        from PyQt5.QtWidgets import QInputDialog
+        from editor.git_sync_dialogs import GitProgressDialog
 
+        memo, ok = QInputDialog.getText(
+            self, "☁️ GitHub 레이아웃 백업",
+            "이번 백업에 기록할 메모/설명을 입력하세요 (선택 사항):\n(예: 기본 작업용, 코딩 모드, 게임 세팅, 단축키 추가 등)",
+            text=""
+        )
+        if not ok:
+            return
+        memo = memo.strip()
+
+        base_dir = r"C:\vial-gui"
+        saved_dir = os.path.join(base_dir, "saved_layouts")
+        os.makedirs(saved_dir, exist_ok=True)
+
+        progress = GitProgressDialog(self, title="☁️ GitHub 레이아웃 백업 진행 중")
+        progress.show()
+        progress.set_progress(10, "현재 키보드 레이아웃 및 설정 캡처 중...", "키맵, 탭댄스, 콤보, DPI 읽는 중")
+
+        try:
             # 1. Capture current layout
             raw_layout = self.keymap_editor.save_layout()
             layout_data = json.loads(raw_layout.decode("utf-8"))
@@ -707,8 +723,10 @@ class MainWindow(QMainWindow):
             now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             now_file_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             layout_data["backup_timestamp"] = now_str
+            layout_data["backup_memo"] = memo if memo else "수동 백업"
 
             # 3. Write files
+            progress.set_progress(35, "로컬 백업 파일(JSON) 생성 및 저장 중...", f"파일명: charybdis_layout_{now_file_str}.json")
             latest_path = os.path.join(saved_dir, "charybdis_layout_latest.json")
             history_path = os.path.join(saved_dir, f"charybdis_layout_{now_file_str}.json")
 
@@ -728,11 +746,17 @@ class MainWindow(QMainWindow):
                 pass
 
             # 4. Git add, commit, push
+            progress.set_progress(60, "Git 변경 사항 스테이징 및 커밋 생성 중...", f"커밋 메시지: backup(layout): save Charybdis layout ({now_str})")
             subprocess.run(["git", "add", "saved_layouts/"], cwd=base_dir, check=True)
-            commit_msg = f"backup(layout): save Charybdis layout ({now_str})"
+            commit_msg = f"backup(layout): save Charybdis layout ({now_str}) - {memo if memo else '수동 백업'}"
             subprocess.run(["git", "commit", "-m", commit_msg], cwd=base_dir)
+
+            progress.set_progress(80, "GitHub 원격 저장소로 푸시(push) 전송 중...", "KimMinSeok-4856/vial-gui (feature/minseok-charybdis-vial)")
             proc = subprocess.run(["git", "push", "origin", "feature/minseok-charybdis-vial"],
-                                  cwd=base_dir, capture_output=True, text=True)
+                                  cwd=base_dir, capture_output=True, text=True, timeout=30)
+
+            progress.set_progress(100, "백업 완료!", "모든 설정이 안전하게 클라우드에 백업되었습니다.")
+            progress.close()
 
             if proc.returncode == 0:
                 QMessageBox.information(
@@ -740,8 +764,9 @@ class MainWindow(QMainWindow):
                     f"🎉 현재 키보드 레이아웃이 GitHub에 성공적으로 백업되었습니다!\n\n"
                     f"• 저장소: KimMinSeok-4856/vial-gui\n"
                     f"• 브랜치: feature/minseok-charybdis-vial\n"
-                    f"• 백업 파일: saved_layouts/charybdis_layout_latest.json\n"
-                    f"• 백업 일시: {now_str}\n\n"
+                    f"• 백업 파일: charybdis_layout_{now_file_str}.json\n"
+                    f"• 백업 일시: {now_str}\n"
+                    f"• 메모: {memo if memo else '없음'}\n\n"
                     f"모든 레이어(0~3), 탭댄스, 콤보, 키 오버라이드, 매크로 및 트랙볼/RGB 설정이 모두 안전하게 저장되었습니다."
                 )
             else:
@@ -750,6 +775,8 @@ class MainWindow(QMainWindow):
                     f"로컬 파일(saved_layouts/) 저장은 완료되었으나, GitHub 푸시 중 메시지가 발생했습니다:\n{proc.stderr}\n{proc.stdout}"
                 )
         except Exception as e:
+            if 'progress' in locals() and progress.isVisible():
+                progress.close()
             QMessageBox.critical(self, "백업 오류", f"레이아웃 백업 중 오류가 발생했습니다:\n{e}")
 
     def on_git_restore(self):
@@ -759,42 +786,112 @@ class MainWindow(QMainWindow):
             return
 
         import json, subprocess, os
-        base_dir = r"C:\vial-gui"
-        latest_path = os.path.join(base_dir, "saved_layouts", "charybdis_layout_latest.json")
+        from keycodes.keycodes import Keycode
+        from editor.git_sync_dialogs import GitProgressDialog, RestoreSelectDialog
 
-        # Try to pull latest from GitHub first
+        base_dir = r"C:\vial-gui"
+        saved_dir = os.path.join(base_dir, "saved_layouts")
+
+        # 1. Sync from GitHub with progress dialog
+        progress = GitProgressDialog(self, title="GitHub 백업 동기화 중")
+        progress.show()
+        progress.set_progress(20, "GitHub에서 최신 백업 목록 동기화 중 (git pull)...", "원격 저장소(KimMinSeok-4856/vial-gui)와 통신 중")
+
         try:
             subprocess.run(["git", "pull", "origin", "feature/minseok-charybdis-vial"],
-                           cwd=base_dir, capture_output=True, text=True)
+                           cwd=base_dir, capture_output=True, text=True, timeout=15)
         except Exception:
             pass
 
-        if not os.path.exists(latest_path):
-            QMessageBox.warning(self, "복원 파일 없음", "GitHub에 저장된 레이아웃 백업 파일(charybdis_layout_latest.json)이 없습니다.\n먼저 'Git에 레이아웃 백업'을 실행하세요.")
+        progress.set_progress(100, "동기화 완료!", "백업 목록을 불러옵니다.")
+        progress.close()
+
+        if not os.path.exists(saved_dir) or not os.listdir(saved_dir):
+            QMessageBox.warning(self, "복원 파일 없음", "GitHub에 저장된 레이아웃 백업 파일이 없습니다.\n먼저 'Git에 레이아웃 백업'을 실행하세요.")
+            return
+
+        # 2. Show historical backup selection dialog
+        dlg = RestoreSelectDialog(self, saved_dir=saved_dir)
+        if dlg.exec_() != QDialog.Accepted:
+            return
+
+        selected_file = dlg.selected_path
+        if not selected_file or not os.path.exists(selected_file):
             return
 
         try:
-            with open(latest_path, "r", encoding="utf-8") as f:
+            with open(selected_file, "r", encoding="utf-8") as f:
                 layout_data = json.load(f)
 
             backup_time = layout_data.get("backup_timestamp", "알 수 없음")
+            backup_memo = layout_data.get("backup_memo", "메모 없음")
             res = QMessageBox.question(
-                self, "GitHub 레이아웃 복원",
-                f"GitHub에 백업된 최신 레이아웃을 키보드에 복원하시겠습니까?\n\n"
+                self, "레이아웃 복원 확인",
+                f"선택한 백업을 키보드에 복원하시겠습니까?\n\n"
                 f"• 백업 일시: {backup_time}\n"
-                f"• 복원 대상: 키맵(0~3 레이어), 탭댄스, 콤보, 키 오버라이드, 매크로, 트랙볼 감도 & RGB\n\n"
+                f"• 백업 메모: {backup_memo}\n"
+                f"• 파일명: {os.path.basename(selected_file)}\n\n"
+                f"복원 대상: 키맵(0~3 레이어), 탭댄스, 콤보, 키 오버라이드, 매크로, 트랙볼 감도 & RGB\n"
                 f"복원 시 현재 키보드의 설정이 백업 시점의 상태로 덮어쓰기됩니다.",
                 QMessageBox.Yes | QMessageBox.No
             )
             if res != QMessageBox.Yes:
                 return
 
-            # 1. Restore standard Vial layout (keymap, combos, tap dance, overrides, macros, QMK settings)
-            raw_vial_bytes = json.dumps(layout_data).encode("utf-8")
-            dev.keyboard.restore_layout(raw_vial_bytes)
+            # 3. Step-by-step restoration with live progress dialog
+            progress = GitProgressDialog(self, title="키보드 레이아웃 복원 진행 중")
+            progress.show()
 
-            # 2. Restore Charybdis settings if present (trackball DPI, auto mouse, layer RGB)
+            # (1) Keymap (Layers 0~3)
+            layout = layout_data.get("layout", [])
+            total_layers = len(layout)
+            for l, layer in enumerate(layout):
+                pct = 10 + int(25 * (l + 1) / max(1, total_layers))
+                progress.set_progress(pct, f"1/6 단계: 레이어 {l} 키 배치 전송 중...", f"총 {total_layers}개 레이어 중 {l+1}번째 복원")
+                for r, row in enumerate(layer):
+                    for c, code in enumerate(row):
+                        if (l, r, c) in dev.keyboard.layout:
+                            dev.keyboard.set_key(l, r, c, Keycode.serialize(Keycode.deserialize(code)))
+                QApplication.processEvents()
+
+            # (2) Encoders & Layout Options
+            if "encoder_layout" in layout_data:
+                for l, layer in enumerate(layout_data["encoder_layout"]):
+                    for e, encoder in enumerate(layer):
+                        dev.keyboard.set_encoder(l, e, 0, Keycode.serialize(Keycode.deserialize(encoder[0])))
+                        dev.keyboard.set_encoder(l, e, 1, Keycode.serialize(Keycode.deserialize(encoder[1])))
+            if "layout_options" in layout_data and layout_data["layout_options"] != -1:
+                dev.keyboard.set_layout_options(layout_data["layout_options"])
+
+            # (3) Macros
+            progress.set_progress(45, "2/6 단계: 매크로(Macros) 설정 복원 중...", "매크로 시퀀스 키보드 메모리에 전송 중")
+            dev.keyboard.restore_macros(layout_data.get("macro"))
+            QApplication.processEvents()
+
+            # (4) Tap Dance
+            progress.set_progress(60, "3/6 단계: 탭 댄스(Tap Dance) 설정 복원 중...", "한번/연타/길게 누르기 동작 복원 중")
+            dev.keyboard.restore_tap_dance(layout_data.get("tap_dance", []))
+            QApplication.processEvents()
+
+            # (5) Combos & Key Overrides
+            progress.set_progress(72, "4/6 단계: 콤보 및 키 오버라이드 복원 중...", "동시 입력 및 단축키 변환 규칙 복원 중")
+            dev.keyboard.restore_combo(layout_data.get("combo", []))
+            dev.keyboard.restore_key_override(layout_data.get("key_override", []))
+            dev.keyboard.restore_alt_repeat_key(layout_data.get("alt_repeat_key", []))
+            QApplication.processEvents()
+
+            # (6) QMK Settings
+            progress.set_progress(82, "5/6 단계: QMK 고급 설정 복원 중...", "디바운스, 탭홀드 타이머 등 전송 중")
+            from editor.qmk_settings import QmkSettings
+            for qsid, value in layout_data.get("settings", dict()).items():
+                qsid = int(qsid)
+                if QmkSettings.is_qsid_supported(qsid):
+                    dev.keyboard.qmk_settings_set(qsid, value)
+            QApplication.processEvents()
+
+            # (7) Charybdis Settings (Trackball DPI, Auto Mouse, Layer RGB)
             if "charybdis_config" in layout_data:
+                progress.set_progress(92, "6/6 단계: Charybdis 트랙볼 및 조명 복원 중...", "트랙볼 DPI 및 레이어별 RGB EEPROM 영구 저장")
                 cfg = layout_data["charybdis_config"]
                 self.charybdis_settings.slider_default_dpi.setValue(cfg.get("default_dpi", 800))
                 self.charybdis_settings.slider_sniping_dpi.setValue(cfg.get("sniping_dpi", 200))
@@ -807,18 +904,28 @@ class MainWindow(QMainWindow):
                 if "3" in colors: self.charybdis_settings.layer_swatches[3].set_color(tuple(colors["3"]))
                 self.charybdis_settings.send_live_config(auto_save_delay=0)
                 self.charybdis_settings.save_to_eeprom()
+                QApplication.processEvents()
 
-            # 3. Refresh all editors UI in-place (never call dev.keyboard.reload() which causes LZMA decompress errors)
+            # (8) Refresh all UI editors
+            progress.set_progress(98, "마무리: 에디터 화면 새로고침 중...", "UI 동기화 진행 중")
             current_tab = self.tabs.currentIndex()
             self.rebuild()
             if 0 <= current_tab < self.tabs.count():
                 self.tabs.setCurrentIndex(current_tab)
+            QApplication.processEvents()
+
+            progress.set_progress(100, "복원 완료!", "키보드와 화면이 최신 상태로 동기화되었습니다.")
+            progress.close()
 
             QMessageBox.information(
                 self, "복원 완료",
-                "🎉 GitHub의 최신 레이아웃이 키보드에 성공적으로 복원 및 영구 저장되었습니다!"
+                f"🎉 선택한 레이아웃이 키보드에 성공적으로 복원 및 영구 저장되었습니다!\n\n"
+                f"• 복원된 백업: {backup_time} ({backup_memo})\n"
+                f"• 복원 파일: {os.path.basename(selected_file)}"
             )
         except Exception as e:
+            if 'progress' in locals() and progress.isVisible():
+                progress.close()
             QMessageBox.critical(self, "복원 오류", f"레이아웃 복원 중 오류가 발생했습니다:\n{e}")
 
     def closeEvent(self, e):
