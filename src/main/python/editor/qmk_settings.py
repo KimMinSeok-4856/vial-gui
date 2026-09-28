@@ -13,6 +13,37 @@ from util import tr
 from vial_device import VialKeyboard
 
 
+QMK_TITLE_TRANSLATIONS = {
+    "Debounce": "디바운스 (스위치 튐 방지 시간, ms)",
+    "Tapping term": "탭 판정 시간 (Tapping term, ms)",
+    "Permissive hold": "허용 홀드 (Permissive hold - 빠른 타이핑 롤오버 허용)",
+    "Hold on other key press": "다른 키 누름 시 즉시 홀드 판정 (Hold on other key press)",
+    "Auto Shift": "오토 시프트 (길게 누르면 대문자/특수기호)",
+    "Auto Shift timeout": "오토 시프트 지연 시간 (ms)",
+    "Combo term": "콤보 동시입력 판정 시간 (Combo term, ms)",
+    "Dynamic macro": "다이나믹 매크로",
+    "Grave Escape": "스마트 물결표/ESC 전환 (Grave Escape)",
+    "Mouse key delay": "마우스 키 반응 지연 (ms)",
+    "Mouse key interval": "마우스 키 이동 간격 (ms)",
+    "Mouse key max speed": "마우스 키 최대 속도",
+    "Mouse key time to max": "마우스 키 가속 시간",
+    "Mouse key wheel delay": "마우스 휠 반응 지연 (ms)",
+    "Mouse key wheel interval": "마우스 휠 스크롤 간격 (ms)",
+    "Mouse key wheel max speed": "마우스 휠 최대 속도",
+    "Mouse key wheel time to max": "마우스 휠 가속 시간",
+}
+
+QMK_TAB_TRANSLATIONS = {
+    "General": "기본 설정 (General)",
+    "Debounce": "디바운스 (Debounce)",
+    "Tapping": "탭 판정 (Tapping)",
+    "Auto Shift": "오토 시프트 (Auto Shift)",
+    "Combo": "콤보 (Combo)",
+    "Mouse keys": "마우스 키 (Mouse keys)",
+    "Dynamic Macro": "다이나믹 매크로",
+}
+
+
 class GenericOption(QObject):
 
     changed = pyqtSignal()
@@ -25,7 +56,9 @@ class GenericOption(QObject):
         self.qsid = self.option["qsid"]
         self.container = container
 
-        self.lbl = QLabel(option["title"])
+        orig_title = option["title"]
+        display_title = QMK_TITLE_TRANSLATIONS.get(orig_title, orig_title)
+        self.lbl = QLabel(display_title)
         self.container.addWidget(self.lbl, self.row, 0)
 
     def reload(self, keyboard):
@@ -104,13 +137,17 @@ class QmkSettings(BasicEditor):
         self.addWidget(self.tabs_widget)
         buttons = QHBoxLayout()
         buttons.addStretch()
-        self.btn_save = QPushButton(tr("QmkSettings", "Save"))
+        self.btn_save = QPushButton("💾 설정 저장 (Save)")
+        self.btn_save.setFixedHeight(30)
+        self.btn_save.setStyleSheet("background-color: #238636; color: white; font-weight: bold; padding: 0 14px; border-radius: 4px;")
         self.btn_save.clicked.connect(self.save_settings)
         buttons.addWidget(self.btn_save)
-        self.btn_undo = QPushButton(tr("QmkSettings", "Undo"))
+        self.btn_undo = QPushButton("🔄 되돌리기 (Undo)")
+        self.btn_undo.setFixedHeight(30)
         self.btn_undo.clicked.connect(self.reload_settings)
         buttons.addWidget(self.btn_undo)
-        btn_reset = QPushButton(tr("QmkSettings", "Reset"))
+        btn_reset = QPushButton("⚠️ 기본값 초기화 (Reset)")
+        btn_reset.setFixedHeight(30)
         btn_reset.clicked.connect(self.reset_settings)
         buttons.addWidget(btn_reset)
         self.addLayout(buttons)
@@ -162,14 +199,33 @@ class QmkSettings(BasicEditor):
             w = QWidget()
             w.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Maximum)
             container = QGridLayout()
+            container.setSpacing(10)
             w.setLayout(container)
+
+            guide_box = QLabel("""
+            <div style="background-color: #161b22; border: 1px solid #30363d; border-left: 4px solid #f0883e; padding: 10px 14px; border-radius: 6px; font-size: 12px; line-height: 1.5; color: #e6edf3; max-width: 580px;">
+                <b style="color: #ffa657; font-size: 13px;">💡 QMK 고급 설정 안내 & 예시</b><br>
+                • <b>Tapping term:</b> 탭댄스나 레이어 홀드 판정 시간 (기본 200ms, 빠른 타건 시 160~180ms 추천)<br>
+                • <b>Debounce:</b> 스위치 튐으로 인한 중복 입력(채터링) 방지 시간 (기본 5ms)<br>
+                • 값을 수정한 후 아래 <b>[💾 설정 저장 (Save)]</b> 버튼을 누르면 EEPROM에 영구 저장됩니다.
+            </div>
+            """)
+            guide_box.setTextFormat(QtCore.Qt.RichText)
+
             l = QVBoxLayout()
+            l.addSpacing(6)
+            l.addWidget(guide_box)
+            l.setAlignment(guide_box, QtCore.Qt.AlignHCenter)
+            l.addSpacing(10)
             l.addWidget(w)
             l.setAlignment(w, QtCore.Qt.AlignHCenter)
+            l.addStretch()
+
             w2 = QWidget()
             w2.setLayout(l)
             self.misc_widgets += [w, w2]
-            self.tabs_widget.addTab(w2, tab["name"])
+            display_tab_name = QMK_TAB_TRANSLATIONS.get(tab["name"], tab["name"])
+            self.tabs_widget.addTab(w2, display_tab_name)
             self.tabs.append(self.populate_tab(tab, container))
 
     def reload_settings(self):

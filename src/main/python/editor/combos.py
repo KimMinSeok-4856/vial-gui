@@ -19,15 +19,35 @@ class ComboEntryUI(QObject):
 
         self.idx = idx
         self.container = QGridLayout()
+        self.container.setSpacing(10)
         self.kc_inputs = []
         self.populate_container()
+
+        guide_box = QLabel(f"""
+        <div style="background-color: #161b22; border: 1px solid #30363d; border-left: 4px solid #3fb950; padding: 12px 16px; border-radius: 6px; font-size: 12px; line-height: 1.6; color: #e6edf3; max-width: 560px;">
+            <b style="color: #7ee787; font-size: 13px;">💡 콤보 (Combo {self.idx + 1}) 설정 방법 & 실전 예시</b><br>
+            두 개 이상의 키를 동시에 눌렀을 때 발동될 조합을 지정합니다.<br>
+            • <b>ESC 콤보 예시:</b> Key 1 = <code>Q</code>, Key 2 = <code>W</code> ➔ Output = <code>ESC</code><br>
+            • <b>엔터 콤보 예시:</b> Key 1 = <code>J</code>, Key 2 = <code>K</code> ➔ Output = <code>Enter</code><br>
+            • <b>마우스 클릭:</b> Key 1 = <code>D</code>, Key 2 = <code>F</code> ➔ Output = <code>BTN1</code> (마우스 좌클릭)<br>
+            (※ 2개 키만 사용하실 때는 Key 3, 4를 빈 칸으로 두시면 됩니다. 설정 즉시 실시간 반영됩니다.)
+        </div>
+        """)
+        guide_box.setTextFormat(QtCore.Qt.RichText)
 
         w = QWidget()
         w.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Maximum)
         w.setLayout(self.container)
+
         l = QVBoxLayout()
+        l.addSpacing(6)
+        l.addWidget(guide_box)
+        l.setAlignment(guide_box, QtCore.Qt.AlignHCenter)
+        l.addSpacing(14)
         l.addWidget(w)
         l.setAlignment(w, QtCore.Qt.AlignHCenter)
+        l.addStretch()
+
         self.w2 = QWidget()
         self.w2.setLayout(l)
 
@@ -35,13 +55,13 @@ class ComboEntryUI(QObject):
         for x in range(4):
             kc_widget = KeyWidget()
             kc_widget.changed.connect(self.on_key_changed)
-            self.container.addWidget(QLabel("Key {}".format(x + 1)), x, 0)
+            self.container.addWidget(QLabel(f"👉 동시 입력 키 {x + 1} (Key {x + 1}):"), x, 0)
             self.container.addWidget(kc_widget, x, 1)
             self.kc_inputs.append(kc_widget)
 
         self.kc_output = KeyWidget()
         self.kc_output.changed.connect(self.on_key_changed)
-        self.container.addWidget(QLabel("Output key"), 4, 0)
+        self.container.addWidget(QLabel("🎯 최종 결과 출력 키 (Output key):"), 4, 0)
         self.container.addWidget(self.kc_output, 4, 1)
 
     def widget(self):

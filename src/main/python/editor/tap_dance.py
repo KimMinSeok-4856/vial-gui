@@ -23,42 +23,58 @@ class TapDanceEntryUI(QObject):
 
         self.idx = idx
         self.container = QGridLayout()
+        self.container.setSpacing(10)
         self.populate_container()
+
+        guide_box = QLabel(f"""
+        <div style="background-color: #161b22; border: 1px solid #30363d; border-left: 4px solid #58a6ff; padding: 12px 16px; border-radius: 6px; font-size: 12px; line-height: 1.6; color: #e6edf3; max-width: 560px;">
+            <b style="color: #79c0ff; font-size: 13px;">💡 탭 댄스 (TD {self.idx}) 설정 방법 & 실전 예시</b><br>
+            스위치 하나를 누르는 조작 패턴에 따라 최대 4가지 키를 할당합니다.<br>
+            • <b>스페이스바 예시:</b> 1번 탭=<code>Space</code> | 길게 홀드=<code>한/영 전환</code> 또는 <code>Shift</code><br>
+            • <b>세미콜론 예시:</b> 1번 탭=<code>;</code> | 2번 연타=<code>:</code> | 길게 홀드=<code>Enter</code><br>
+            • <b>키맵 적용법:</b> 위 항목을 지정한 뒤, <b>[키맵(Keymap)]</b> 탭에서 원하는 키를 누르고 <code>TD({self.idx})</code>를 할당하세요!
+        </div>
+        """)
+        guide_box.setTextFormat(QtCore.Qt.RichText)
 
         w = QWidget()
         w.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Maximum)
         w.setLayout(self.container)
+
         l = QVBoxLayout()
-        l.addStretch()
-        l.addSpacing(10)
+        l.addSpacing(6)
+        l.addWidget(guide_box)
+        l.setAlignment(guide_box, QtCore.Qt.AlignHCenter)
+        l.addSpacing(14)
         l.addWidget(w)
         l.setAlignment(w, QtCore.Qt.AlignHCenter)
-        l.addSpacing(10)
-        lbl = QLabel("Use <code>TD({})</code> to set up this action in the keymap.".format(self.idx))
-        l.addWidget(lbl)
-        l.setAlignment(lbl, QtCore.Qt.AlignHCenter)
         l.addStretch()
+
         self.w2 = QWidget()
         self.w2.setLayout(l)
 
     def populate_container(self):
-        self.container.addWidget(QLabel("On tap"), 0, 0)
+        self.container.addWidget(QLabel("1️⃣ 한 번 가볍게 탭할 때 (On tap):"), 0, 0)
         self.kc_on_tap = KeyWidget()
         self.kc_on_tap.changed.connect(self.on_key_changed)
         self.container.addWidget(self.kc_on_tap, 0, 1)
-        self.container.addWidget(QLabel("On hold"), 1, 0)
+
+        self.container.addWidget(QLabel("2️⃣ 길게 꾹 누르고 있을 때 (On hold):"), 1, 0)
         self.kc_on_hold = KeyWidget()
         self.kc_on_hold.changed.connect(self.on_key_changed)
         self.container.addWidget(self.kc_on_hold, 1, 1)
-        self.container.addWidget(QLabel("On double tap"), 2, 0)
+
+        self.container.addWidget(QLabel("3️⃣ 두 번 빠르게 연타할 때 (On double tap):"), 2, 0)
         self.kc_on_double_tap = KeyWidget()
         self.kc_on_double_tap.changed.connect(self.on_key_changed)
         self.container.addWidget(self.kc_on_double_tap, 2, 1)
-        self.container.addWidget(QLabel("On tap + hold"), 3, 0)
+
+        self.container.addWidget(QLabel("4️⃣ 한 번 탭한 직후 길게 누를 때 (On tap + hold):"), 3, 0)
         self.kc_on_tap_hold = KeyWidget()
         self.kc_on_tap_hold.changed.connect(self.on_key_changed)
         self.container.addWidget(self.kc_on_tap_hold, 3, 1)
-        self.container.addWidget(QLabel("Tapping term (ms)"), 4, 0)
+
+        self.container.addWidget(QLabel("⏱️ 탭 판정 시간 (Tapping term, ms / 0=기본값):"), 4, 0)
         self.txt_tapping_term = QSpinBox()
         self.txt_tapping_term.valueChanged.connect(self.on_timing_changed)
         self.txt_tapping_term.setMinimum(0)

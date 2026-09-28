@@ -72,13 +72,13 @@ class OptionsUI(QWidget):
 
         container = QVBoxLayout()
 
-        self.opt_activation_trigger_down = CheckBoxNoPadding("Activate when the trigger key is pressed down")
-        self.opt_activation_required_mod_down = CheckBoxNoPadding("Activate when a necessary modifier is pressed down")
-        self.opt_activation_negative_mod_up = CheckBoxNoPadding("Activate when a negative modifier is released")
-        self.opt_one_mod = CheckBoxNoPadding("Activate on one modifier")
-        self.opt_no_reregister_trigger = CheckBoxNoPadding("Don't deactivate when another key is pressed down")
+        self.opt_activation_trigger_down = CheckBoxNoPadding("트리거 키가 눌리는 순간 즉시 발동 (Trigger down)")
+        self.opt_activation_required_mod_down = CheckBoxNoPadding("필수 보조키가 눌리는 순간 발동 (Required mod down)")
+        self.opt_activation_negative_mod_up = CheckBoxNoPadding("금지 보조키에서 손을 떼는 순간 발동 (Negative mod up)")
+        self.opt_one_mod = CheckBoxNoPadding("여러 보조키 중 하나만 맞아도 발동 (One mod)")
+        self.opt_no_reregister_trigger = CheckBoxNoPadding("다른 키를 추가로 눌러도 오버라이드 유지 (No deactivate)")
         self.opt_no_unregister_on_other_key_down = CheckBoxNoPadding(
-            "Don't register the trigger key again after the override is deactivated")
+            "오버라이드 종료 후 트리거 키 중복 재입력 방지")
 
         for w in [self.opt_activation_trigger_down, self.opt_activation_required_mod_down,
                   self.opt_activation_negative_mod_up, self.opt_one_mod, self.opt_no_reregister_trigger,
@@ -188,39 +188,60 @@ class KeyOverrideEntryUI(QObject):
 
         self.idx = idx
         self.container = QGridLayout()
+        self.container.setSpacing(10)
         self.populate_container()
+
+        guide_box = QLabel(f"""
+        <div style="background-color: #161b22; border: 1px solid #30363d; border-left: 4px solid #a371f7; padding: 12px 16px; border-radius: 6px; font-size: 12px; line-height: 1.6; color: #e6edf3; max-width: 580px;">
+            <b style="color: #d2a8ff; font-size: 13px;">💡 키 오버라이드 ({self.idx + 1}) 설정 방법 & 실전 예시</b><br>
+            특정 보조키와 함께 눌렸을 때 기본 출력을 가로채어 완전히 다른 키로 바꿉니다.<br>
+            • <b>실전 추천 예시: Shift + Backspace ➔ Delete 키 만들기</b><br>
+            &nbsp;&nbsp;1. 맨 위 <b>[활성화]</b> 체크<br>
+            &nbsp;&nbsp;2. <b>[방아쇠 기본 키(Trigger)]:</b> <code>Backspace</code> 지정<br>
+            &nbsp;&nbsp;3. <b>[함께 누를 보조키(Trigger mods)]:</b> <code>LShift</code> 또는 <code>RShift</code> 체크<br>
+            &nbsp;&nbsp;4. <b>[출력 시 숨길 보조키(Suppressed mods)]:</b> <code>LShift</code> 체크 <i>(Delete 입력 시 Shift 전달 차단!)</i><br>
+            &nbsp;&nbsp;5. <b>[대체 출력 키(Replacement)]:</b> <code>Delete</code> 지정
+        </div>
+        """)
+        guide_box.setTextFormat(QtCore.Qt.RichText)
 
         w = QWidget()
         w.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Maximum)
         w.setLayout(self.container)
+
         l = QVBoxLayout()
+        l.addSpacing(6)
+        l.addWidget(guide_box)
+        l.setAlignment(guide_box, QtCore.Qt.AlignHCenter)
+        l.addSpacing(14)
         l.addWidget(w)
         l.setAlignment(w, QtCore.Qt.AlignHCenter)
+        l.addStretch()
         self.w2 = make_scrollable(l)
 
     def populate_container(self):
-        self.container.addWidget(QLabel("Enable"), 0, 0)
+        self.container.addWidget(QLabel("✅ 오버라이드 활성화 (Enable):"), 0, 0)
         self.container.addWidget(self.enable_chk, 0, 1)
 
-        self.container.addWidget(QLabel("Enable on layers"), 1, 0)
+        self.container.addWidget(QLabel("적용할 레이어 번호 (Layers):"), 1, 0)
         self.container.addWidget(self.layers, 1, 1)
 
-        self.container.addWidget(QLabel("Trigger"), 2, 0)
+        self.container.addWidget(QLabel("👉 방아쇠 기본 키 (Trigger key):"), 2, 0)
         self.container.addWidget(self.trigger_key, 2, 1)
 
-        self.container.addWidget(QLabel("Trigger mods"), 3, 0)
+        self.container.addWidget(QLabel("➕ 함께 누를 필수 보조키 (Trigger mods):"), 3, 0)
         self.container.addWidget(self.trigger_mods, 3, 1)
 
-        self.container.addWidget(QLabel("Negative mods"), 4, 0)
+        self.container.addWidget(QLabel("⛔ 누르면 안 되는 보조키 (Negative mods):"), 4, 0)
         self.container.addWidget(self.negative_mods, 4, 1)
 
-        self.container.addWidget(QLabel("Suppressed mods"), 5, 0)
+        self.container.addWidget(QLabel("🛡️ 출력 시 가로채서 숨길 보조키 (Suppressed mods):"), 5, 0)
         self.container.addWidget(self.suppressed_mods, 5, 1)
 
-        self.container.addWidget(QLabel("Replacement"), 6, 0)
+        self.container.addWidget(QLabel("🎯 최종 대체 출력 키 (Replacement key):"), 6, 0)
         self.container.addWidget(self.key_replacement, 6, 1)
 
-        self.container.addWidget(QLabel("Options"), 7, 0)
+        self.container.addWidget(QLabel("⚙️ 세부 발동 옵션 (Options):"), 7, 0)
         self.container.addWidget(self.options, 7, 1)
 
     def widget(self):
