@@ -65,7 +65,8 @@ class PerformanceInputListener(QWidget):
     High-performance RawInput and Qt event listener that captures
     microsecond-accurate hardware reports from Keyboard and Mouse/Trackball.
     """
-    key_packet_signal = pyqtSignal(float, str, bool) # timestamp, key_name, is_down
+    key_packet_signal = pyqtSignal(float) # pure hardware packet timestamp
+    ui_key_signal = pyqtSignal(float, str, bool, bool) # timestamp, key_name, is_down, is_repeat
     mouse_packet_signal = pyqtSignal(float, int, int) # timestamp, dx, dy
 
     def __init__(self, parent=None):
@@ -114,24 +115,33 @@ class PerformanceInputListener(QWidget):
                 if res != -1:
                     if header.dwType == 0: # Mouse / Trackball
                         self.mouse_packet_signal.emit(now, 0, 0)
-                    elif header.dwType == 1: # Keyboard
-                        self.key_packet_signal.emit(now, "", True)
+                    elif header.dwType == 1: # Keyboard (pure hardware report)
+                        self.key_packet_signal.emit(now)
         return super().nativeEvent(eventType, message)
 
     def keyPressEvent(self, event):
         now = time.perf_counter()
+        is_repeat = event.isAutoRepeat()
         key_name = QtGui.QKeySequence(event.key()).toString()
         if not key_name or event.key() == Qt.Key_Space:
             key_name = "Space" if event.key() == Qt.Key_Space else f"Key_{event.key()}"
-        self.key_packet_signal.emit(now, key_name, True)
+        self.ui_key_signal.emit(now, key_name, True, is_repeat)
+
+        # Fallback for non-Windows platforms without RawInput
+        if not self.raw_input_registered and not is_repeat:
+            self.key_packet_signal.emit(now)
         event.accept()
 
     def keyReleaseEvent(self, event):
         now = time.perf_counter()
+        is_repeat = event.isAutoRepeat()
         key_name = QtGui.QKeySequence(event.key()).toString()
         if not key_name or event.key() == Qt.Key_Space:
             key_name = "Space" if event.key() == Qt.Key_Space else f"Key_{event.key()}"
-        self.key_packet_signal.emit(now, key_name, False)
+        self.ui_key_signal.emit(now, key_name, False, is_repeat)
+
+        if not self.raw_input_registered and not is_repeat:
+            self.key_packet_signal.emit(now)
         event.accept()
 
     def mouseMoveEvent(self, event):
@@ -310,6 +320,8 @@ class PerformanceTester(BasicEditor):
         self.chatter_count = 0
         self.clean_press_count = 0
         self.recent_key_tags = deque(maxlen=8)
+        self.is_holding_repeat = False
+        self.last_repeat_time = 0.0
 
         # Build UI
         self._init_ui()
@@ -463,6 +475,7 @@ class PerformanceTester(BasicEditor):
 
         # Connect signals
         self.listener.key_packet_signal.connect(self._on_key_packet)
+        self.listener.ui_key_signal.connect(self._on_ui_key)
         self.listener.mouse_packet_signal.connect(self._on_mouse_packet)
 
         # Recent key tags stream
@@ -515,59 +528,68 @@ class PerformanceTester(BasicEditor):
         """)
         return card
 
-    def _on_key_packet(self, timestamp, key_name, is_down):
+    def _on_key_packet(self, timestamp):
         # Calculate interval between hardware packet reports
         if self.last_key_packet_time is not None:
             dt = timestamp - self.last_key_packet_time
-            if 0.0002 <= dt <= 0.060: # 16Hz to 5000Hz packet window
+            if 0.00075 <= dt <= 0.060: # 16Hz to ~1333Hz packet window
                 hz = 1.0 / dt
                 self.key_intervals.append(dt)
-                self.current_key_hz = hz
-                if hz > self.peak_key_hz:
-                    self.peak_key_hz = min(hz, 2000.0) # Sanity clamp
+                clamped_hz = min(hz, 1000.0) # 1000Hz nominal USB ceiling
+                self.current_key_hz = clamped_hz
+                if clamped_hz > self.peak_key_hz:
+                    self.peak_key_hz = clamped_hz
         self.last_key_packet_time = timestamp
         self.key_packet_count += 1
 
-        if key_name:
-            if is_down:
-                self.pressed_keys.add(key_name)
-                if len(self.pressed_keys) > self.max_rollover:
-                    self.max_rollover = len(self.pressed_keys)
+    def _on_ui_key(self, timestamp, key_name, is_down, is_repeat):
+        if is_repeat:
+            self.is_holding_repeat = True
+            self.last_repeat_time = timestamp
+            return
 
-                # CPS tracking
-                self.recent_clicks.append(timestamp)
+        self.is_holding_repeat = False
 
-                # Chatter / Debounce check: check time since last UP of the SAME key
-                if key_name in self.key_up_times:
-                    repress_delta_ms = (timestamp - self.key_up_times[key_name]) * 1000.0
-                    # If pressed again in under 12ms, suspect physical switch chatter
-                    if repress_delta_ms < 12.0:
-                        self.chatter_count += 1
-                        self.recent_key_tags.append(f"<span style='color:#f85149; font-weight:bold;'>⚠️{key_name} ({repress_delta_ms:.1f}ms 채터링)</span>")
-                    else:
-                        self.clean_press_count += 1
-                        self.recent_key_tags.append(f"<span style='color:#58a6ff;'>[{key_name}]</span>")
+        if is_down:
+            self.pressed_keys.add(key_name)
+            if len(self.pressed_keys) > self.max_rollover:
+                self.max_rollover = len(self.pressed_keys)
+
+            # CPS tracking
+            self.recent_clicks.append(timestamp)
+
+            # Chatter / Debounce check: check time since last UP of the SAME key
+            if key_name in self.key_up_times:
+                repress_delta_ms = (timestamp - self.key_up_times[key_name]) * 1000.0
+                # If pressed again in under 12ms, suspect physical switch chatter
+                if repress_delta_ms < 12.0:
+                    self.chatter_count += 1
+                    self.recent_key_tags.append(f"<span style='color:#f85149; font-weight:bold;'>⚠️{key_name} ({repress_delta_ms:.1f}ms 채터링)</span>")
                 else:
                     self.clean_press_count += 1
                     self.recent_key_tags.append(f"<span style='color:#58a6ff;'>[{key_name}]</span>")
-
-                self.key_down_times[key_name] = timestamp
             else:
-                self.pressed_keys.discard(key_name)
-                self.key_up_times[key_name] = timestamp
-                if key_name in self.key_down_times:
-                    hold_dur_ms = (timestamp - self.key_down_times[key_name]) * 1000.0
-                    self.recent_key_tags.append(f"<span style='color:#8b949e;'>[{key_name} 뗌: {hold_dur_ms:.0f}ms]</span>")
+                self.clean_press_count += 1
+                self.recent_key_tags.append(f"<span style='color:#58a6ff;'>[{key_name}]</span>")
+
+            self.key_down_times[key_name] = timestamp
+        else:
+            self.pressed_keys.discard(key_name)
+            self.key_up_times[key_name] = timestamp
+            if key_name in self.key_down_times:
+                hold_dur_ms = (timestamp - self.key_down_times[key_name]) * 1000.0
+                self.recent_key_tags.append(f"<span style='color:#8b949e;'>[{key_name} 뗌: {hold_dur_ms:.0f}ms]</span>")
 
     def _on_mouse_packet(self, timestamp, dx, dy):
         if self.last_mouse_packet_time is not None:
             dt = timestamp - self.last_mouse_packet_time
-            if 0.0002 <= dt <= 0.060:
+            if 0.00075 <= dt <= 0.060:
                 hz = 1.0 / dt
                 self.mouse_intervals.append(dt)
-                self.current_mouse_hz = hz
-                if hz > self.peak_mouse_hz:
-                    self.peak_mouse_hz = min(hz, 2000.0)
+                clamped_m_hz = min(hz, 1000.0)
+                self.current_mouse_hz = clamped_m_hz
+                if clamped_m_hz > self.peak_mouse_hz:
+                    self.peak_mouse_hz = clamped_m_hz
         self.last_mouse_packet_time = timestamp
         self.mouse_reports_in_second += 1
 
@@ -591,7 +613,10 @@ class PerformanceTester(BasicEditor):
         self.lbl_key_hz.setText(f"{int(round(self.current_key_hz))} Hz")
         self.bar_key_hz.setValue(int(min(self.current_key_hz, 1000)))
 
-        if self.current_key_hz >= 900:
+        if self.is_holding_repeat and (now - self.last_repeat_time) < 0.35:
+            self.lbl_key_status.setText("⌨️ 단일 키 누름 유지 중 (Windows 반복: ~30Hz)")
+            self.lbl_key_status.setStyleSheet("font-size: 11px; color: #ffa657; background: #2f2515; padding: 4px 8px; border-radius: 4px; border: 1px solid #9e6a03;")
+        elif self.current_key_hz >= 900:
             self.lbl_key_status.setText("🚀 1000Hz 최고 성능 (Ultra-Fast)")
             self.lbl_key_status.setStyleSheet("font-size: 11px; color: #3fb950; background: #1c3222; padding: 4px 8px; border-radius: 4px; border: 1px solid #238636;")
         elif self.current_key_hz >= 450:
