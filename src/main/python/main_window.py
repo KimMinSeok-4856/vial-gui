@@ -32,6 +32,7 @@ from unlocker import Unlocker
 from util import tr, EXAMPLE_KEYBOARDS, KeycodeDisplay, EXAMPLE_KEYBOARD_PREFIX
 from vial_device import VialKeyboard
 from editor.matrix_test import MatrixTest
+from editor.performance_tester import PerformanceTester
 
 import themes
 
@@ -144,6 +145,7 @@ class MainWindow(QMainWindow):
         self.matrix_tester = MatrixTest(self.layout_editor)
         self.rgb_configurator = RGBConfigurator()
         self.charybdis_settings = CharybdisEditor()
+        self.performance_tester = PerformanceTester()
 
         self.editors = [(self.keymap_editor, "Keymap"), (self.layout_editor, "Layout"),
                         (self.charybdis_settings, "Charybdis"),
@@ -151,6 +153,7 @@ class MainWindow(QMainWindow):
                         (self.tap_dance, "Tap Dance"), (self.combos, "Combos"),
                         (self.key_override, "Key Overrides"), (self.alt_repeat_key, "Alt Repeat Key"),
                         (self.qmk_settings, "QMK Settings"), (self.matrix_tester, "Matrix tester"),
+                        (self.performance_tester, "Performance"),
                         (self.firmware_flasher, "Firmware updater")]
 
         Unlocker.global_layout_editor = self.layout_editor
@@ -442,7 +445,8 @@ class MainWindow(QMainWindow):
 
         for e in [self.layout_editor, self.keymap_editor, self.firmware_flasher, self.macro_recorder,
                   self.tap_dance, self.combos, self.key_override, self.alt_repeat_key,
-                  self.qmk_settings, self.matrix_tester, self.rgb_configurator, self.charybdis_settings]:
+                  self.qmk_settings, self.matrix_tester, self.performance_tester,
+                  self.rgb_configurator, self.charybdis_settings]:
             e.rebuild(self.autorefresh.current_device)
 
     TAB_NAMES = {
@@ -457,6 +461,7 @@ class MainWindow(QMainWindow):
         "Alt Repeat Key": ("🔁 키 반복 (Alt Repeat)", "이전에 누른 키를 반복하거나 특정 대체 키를 출력합니다."),
         "QMK Settings": ("⚙️ QMK 고급설정 (Settings)", "디바운스, 탭 홀드 시간, 자동 마우스 레이어 등 QMK 내부 변수를 조절합니다."),
         "Matrix tester": ("🧪 키 입력 테스트 (Tester)", "키보드의 각 스위치와 트랙볼이 정상적으로 입력되는지 시각적으로 테스트합니다."),
+        "Performance": ("⚡ 성능 & 폴링레이트 (Benchmark)", "실제 USB 폴링레이트(Hz), 입력 지연시간(ms), 트랙볼 전송률, 스위치 채터링, CPS, 반응속도를 실시간 측정합니다."),
         "Firmware updater": ("🚀 펌웨어 업데이트 (Updater)", "부트로더 진입 및 펌웨어 업데이트를 수행합니다."),
     }
 
@@ -578,6 +583,17 @@ class MainWindow(QMainWindow):
                 <b>💡 활용 예시:</b>
                 <ul>
                     <li>키보드 스위치 교체(핫스왑) 후 접점 핀이 휘었거나 인식이 안 되는 스위치가 있는지 즉시 진단.</li>
+                </ul>
+            </div>
+
+            <h2 style="color: #79c0ff; font-size: 16px; margin-top: 20px;">⚡ 11. 성능 & 폴링레이트 (Benchmark)</h2>
+            <p><b>역할:</b> 키보드 및 Charybdis 내장 트랙볼의 실제 USB 전송 주기(Hz), 입력 간격 지연(ms), 스위치 채터링, 실시간 CPS, 반응속도를 정밀 분석합니다.</p>
+            <div style="background-color: #161b22; border-left: 3px solid #388bfd; padding: 8px 12px; margin-bottom: 12px; border-radius: 4px;">
+                <b>💡 활용 예시:</b>
+                <ul>
+                    <li><b>USB 1000Hz 측정:</b> 키보드와 트랙볼이 1.0ms(1000Hz) 간격으로 정상 전송되는지 실시간 검증.</li>
+                    <li><b>스위치 채터링 감지:</b> 스위치 노후화나 헐거움으로 인한 15ms 이내 비정상 더블클릭 중복 입력 실시간 감시.</li>
+                    <li><b>반응속도 벤치마크:</b> 화면이 초록색으로 바뀔 때 누르면 본인의 반사 신경과 입력 지연시간을 합산 측정.</li>
                 </ul>
             </div>
         </div>
