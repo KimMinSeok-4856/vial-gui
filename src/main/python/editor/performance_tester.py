@@ -321,11 +321,10 @@ class PerformanceTester(BasicEditor):
     def _init_ui(self):
         guide_box = QLabel("""
         <div style="background-color: #161b22; border: 1px solid #30363d; border-left: 4px solid #58a6ff; padding: 12px 16px; border-radius: 6px; font-size: 12px; line-height: 1.6; color: #e6edf3;">
-            <b style="color: #79c0ff; font-size: 14px;">⚡ 키보드 & 트랙볼 실시간 성능 벤치마크 (Performance & Polling Rate)</b><br>
-            키를 빠르게 누르거나 내장 트랙볼을 굴리면 <b>실제 USB 전송 주기(Hz)</b>와 <b>신호 지연시간(ms)</b>, <b>스위치 채터링</b>을 실시간 측정합니다.<br>
-            • <b>폴링레이트(Polling Rate):</b> 1초 동안 PC와 주고받는 신호 횟수 (1000Hz = 1.0ms 주기, 500Hz = 2.0ms, 125Hz = 8.0ms)<br>
-            • <b>지터(Jitter):</b> 신호 간격의 흔들림(표준편차) — 0에 가까울수록 신호가 매우 일정하고 균일하게 전송됨<br>
-            • <b>채터링(Chatter) 감지:</b> 스위치 접점 바운싱으로 15ms 이내 비정상적인 초고속 중복 입력이 발생하는지 실시간 감시
+            <b style="color: #79c0ff; font-size: 14px;">⚡ 키보드 & 트랙볼 폴링레이트 측정 원리 및 가장 정확한 측정법</b><br>
+            • <b>⌨️ 키보드 정확한 측정법:</b> 키보드는 가만히 있을 때 신호가 0이며 키를 누를 때만 전송됩니다. 따라서 <b>두 키(예: F와 J)를 양손으로 번갈아 아주 빠르게 연타(트릴)</b>하거나, <b>키보드 가로 한 줄(ASDFGHJKL)을 손가락으로 드래그하듯 쫙 훑어 누르면</b> 이벤트 간 최소 시간차가 <b>1.0ms(1000Hz)</b>에 수렴하면서 최고/평균 전송 주기가 가장 정확하게 측정됩니다.<br>
+            • <b>🖱️ 트랙볼 정확한 측정법:</b> Charybdis 내장 트랙볼을 빠르게 휙 굴리면 마우스 광학 센서(PMW3360)에서 1초에 최대 1000개의 패킷이 연속 쏟아져 나오므로 <b>즉시 1000Hz가 실시간 측정</b>되며, 동일 MCU를 공유하는 키보드의 1000Hz USB 대역폭이 함께 직접 검증됩니다.<br>
+            • <b>🎯 1000Hz 판정 기준:</b> 최고치 1000Hz / 최소 패킷 간격 <b>1.00ms 안팎</b> (500Hz는 2.0ms 밑으로 내려가지 못함, 125Hz는 8.0ms)
         </div>
         """)
         guide_box.setTextFormat(Qt.RichText)
@@ -456,7 +455,7 @@ class PerformanceTester(BasicEditor):
         """)
         l_layout = QVBoxLayout(self.listener)
         l_layout.setAlignment(Qt.AlignCenter)
-        self.lbl_listener_hint = QLabel("⌨️ 여기를 클릭하거나 아무 키나 누르며 연속 타건해 보세요!\n(실시간 키패킷, CPS, 동시입력, 스위치 떨림 채터링 자동 검사)")
+        self.lbl_listener_hint = QLabel("⌨️ <b>[정확한 측정 팁]</b> 두 키(예: <b>F</b>와 <b>J</b>)를 번갈아 매우 빠르게 연타하거나, 키 열을 훑듯이 누르세요!\n(최소 패킷 간격 1.00ms = 1000Hz 하드웨어 성능 실시간 분석)")
         self.lbl_listener_hint.setAlignment(Qt.AlignCenter)
         self.lbl_listener_hint.setStyleSheet("font-size: 12px; color: #8b949e; border: none;")
         l_layout.addWidget(self.lbl_listener_hint)
