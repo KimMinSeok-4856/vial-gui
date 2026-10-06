@@ -3,7 +3,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtWidgets import (
     QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QPushButton,
     QSlider, QCheckBox, QGroupBox, QColorDialog, QScrollArea,
-    QWidget, QFrame, QMessageBox
+    QWidget, QFrame, QMessageBox, QComboBox
 )
 from editor.basic_editor import BasicEditor
 
@@ -129,6 +129,52 @@ class CharybdisEditor(BasicEditor):
             b_layout.addLayout(p_layout)
 
             vbox.addWidget(box)
+
+        # 4. RGB Sleep / Idle Timeout
+        box_sleep = QGroupBox("⏱️ RGB 자동 절전 타이머 (Sleep Timeout)")
+        b_sleep_layout = QVBoxLayout(box_sleep)
+
+        h_sleep_row = QHBoxLayout()
+        lbl_sleep_title = QLabel("키보드 미입력 / PC 절전 시 소등 대기시간:")
+        lbl_sleep_title.setStyleSheet("font-weight: bold; font-size: 12px;")
+        h_sleep_row.addWidget(lbl_sleep_title)
+
+        self.combo_rgb_timeout = QComboBox()
+        self.TIMEOUT_OPTIONS = [
+            (0, "🌙 사용 안 함 (항상 켜짐)"),
+            (30, "⏱️ 30초"),
+            (60, "⏱️ 1분 (기본 권장)"),
+            (120, "⏱️ 2분"),
+            (180, "⏱️ 3분"),
+            (300, "⏱️ 5분"),
+            (600, "⏱️ 10분"),
+            (900, "⏱️ 15분"),
+            (1800, "⏱️ 30분"),
+        ]
+        for sec, text in self.TIMEOUT_OPTIONS:
+            self.combo_rgb_timeout.addItem(text, sec)
+
+        self.combo_rgb_timeout.setFixedHeight(30)
+        self.combo_rgb_timeout.setStyleSheet("""
+            QComboBox {
+                font-size: 12px;
+                font-weight: bold;
+                padding: 3px 10px;
+                min-width: 170px;
+            }
+        """)
+        self.combo_rgb_timeout.currentIndexChanged.connect(self._on_timeout_changed)
+        h_sleep_row.addWidget(self.combo_rgb_timeout)
+        h_sleep_row.addStretch()
+
+        b_sleep_layout.addLayout(h_sleep_row)
+
+        lbl_desc = QLabel("ℹ️ 설정된 시간 동안 키 입력이나 마우스 움직임이 없으면 양손 RGB LED가 자동으로 꺼집니다.\n"
+                          "   (아무 키나 누르거나 트랙볼을 움직이면 즉시 다시 켜집니다)")
+        lbl_desc.setStyleSheet("color: #8b949e; font-size: 11px;")
+        b_sleep_layout.addWidget(lbl_desc)
+
+        vbox.addWidget(box_sleep)
 
         return grp
 
@@ -266,6 +312,10 @@ class CharybdisEditor(BasicEditor):
     def _on_config_changed(self):
         self.send_live_config(auto_save_delay=50)
 
+    def _on_timeout_changed(self, idx):
+        self.send_live_config(auto_save_delay=100)
+        self.set_status(f"⚡ RGB 절전 타이머 설정: {self.combo_rgb_timeout.currentText()} (적용됨)")
+
     def load_from_keyboard(self):
         if not self.device or not self.device.keyboard:
             return
@@ -285,6 +335,7 @@ class CharybdisEditor(BasicEditor):
                 l1 = (resp[12], resp[13], resp[14])
                 l2 = (resp[15], resp[16], resp[17])
                 l3 = (resp[18], resp[19], resp[20])
+                timeout_sec = ((resp[21] << 8) | resp[22]) if len(resp) >= 23 else 60
 
                 # Block signals during load
                 self.slider_default_dpi.blockSignals(True)
@@ -292,6 +343,7 @@ class CharybdisEditor(BasicEditor):
                 self.slider_auto_mouse_time.blockSignals(True)
                 self.chk_auto_mouse.blockSignals(True)
                 self.chk_rev_y.blockSignals(True)
+                self.combo_rgb_timeout.blockSignals(True)
 
                 self.slider_default_dpi.setValue(default_dpi)
                 self.lbl_default_dpi.setText(f"{default_dpi} DPI")
@@ -309,11 +361,19 @@ class CharybdisEditor(BasicEditor):
                 self.layer_swatches[2].set_color(l2)
                 self.layer_swatches[3].set_color(l3)
 
+                matched_idx = 2  # 기본 1분 (60초)
+                for i in range(self.combo_rgb_timeout.count()):
+                    if self.combo_rgb_timeout.itemData(i) == timeout_sec:
+                        matched_idx = i
+                        break
+                self.combo_rgb_timeout.setCurrentIndex(matched_idx)
+
                 self.slider_default_dpi.blockSignals(False)
                 self.slider_sniping_dpi.blockSignals(False)
                 self.slider_auto_mouse_time.blockSignals(False)
                 self.chk_auto_mouse.blockSignals(False)
                 self.chk_rev_y.blockSignals(False)
+                self.combo_rgb_timeout.blockSignals(False)
 
                 self.set_status("키보드에서 설정을 성공적으로 불러왔습니다.")
         except Exception as e:
@@ -336,6 +396,10 @@ class CharybdisEditor(BasicEditor):
             l2 = self.layer_swatches[2].current_rgb
             l3 = self.layer_swatches[3].current_rgb
 
+            timeout_sec = self.combo_rgb_timeout.currentData() if hasattr(self, 'combo_rgb_timeout') else 60
+            if timeout_sec is None:
+                timeout_sec = 60
+
             pkt = [
                 0xFC, 0x02,
                 (def_dpi >> 8) & 0xFF, def_dpi & 0xFF,
@@ -345,7 +409,8 @@ class CharybdisEditor(BasicEditor):
                 buf, rev_y,
                 l1[0], l1[1], l1[2],
                 l2[0], l2[1], l2[2],
-                l3[0], l3[1], l3[2]
+                l3[0], l3[1], l3[2],
+                (timeout_sec >> 8) & 0xFF, timeout_sec & 0xFF
             ]
             pkt += [0] * (32 - len(pkt))
             self.device.send(bytes(pkt))
