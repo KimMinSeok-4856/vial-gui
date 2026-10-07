@@ -33,6 +33,7 @@ from util import tr, EXAMPLE_KEYBOARDS, KeycodeDisplay, EXAMPLE_KEYBOARD_PREFIX
 from vial_device import VialKeyboard
 from editor.matrix_test import MatrixTest
 from editor.performance_tester import PerformanceTester
+from editor.monkeytype_editor import MonkeytypeEditor
 
 import themes
 
@@ -146,6 +147,7 @@ class MainWindow(QMainWindow):
         self.rgb_configurator = RGBConfigurator()
         self.charybdis_settings = CharybdisEditor()
         self.performance_tester = PerformanceTester()
+        self.monkeytype_editor = MonkeytypeEditor()
 
         self.editors = [(self.keymap_editor, "Keymap"), (self.layout_editor, "Layout"),
                         (self.charybdis_settings, "Charybdis"),
@@ -154,6 +156,7 @@ class MainWindow(QMainWindow):
                         (self.key_override, "Key Overrides"), (self.alt_repeat_key, "Alt Repeat Key"),
                         (self.qmk_settings, "QMK Settings"), (self.matrix_tester, "Matrix tester"),
                         (self.performance_tester, "Performance"),
+                        (self.monkeytype_editor, "Typing Trainer"),
                         (self.firmware_flasher, "Firmware updater")]
 
         Unlocker.global_layout_editor = self.layout_editor
@@ -446,6 +449,7 @@ class MainWindow(QMainWindow):
         for e in [self.layout_editor, self.keymap_editor, self.firmware_flasher, self.macro_recorder,
                   self.tap_dance, self.combos, self.key_override, self.alt_repeat_key,
                   self.qmk_settings, self.matrix_tester, self.performance_tester,
+                  self.monkeytype_editor,
                   self.rgb_configurator, self.charybdis_settings]:
             e.rebuild(self.autorefresh.current_device)
 
@@ -462,6 +466,7 @@ class MainWindow(QMainWindow):
         "QMK Settings": ("⚙️ QMK 고급설정 (Settings)", "디바운스, 탭 홀드 시간, 자동 마우스 레이어 등 QMK 내부 변수를 조절합니다."),
         "Matrix tester": ("🧪 키 입력 테스트 (Tester)", "키보드의 각 스위치와 트랙볼이 정상적으로 입력되는지 시각적으로 테스트합니다."),
         "Performance": ("⚡ 성능 & 폴링레이트 (Benchmark)", "실제 USB 폴링레이트(Hz), 입력 지연시간(ms), 트랙볼 전송률, 스위치 채터링, CPS, 반응속도를 실시간 측정합니다."),
+        "Typing Trainer": ("🐵 타자 연습 (Monkeytype)", "Monkeytype 스타일의 실시간 WPM, 정확도, 한글/영문/3x6 스플릿 레이어 특수문자 타자 연습을 진행합니다."),
         "Firmware updater": ("🚀 펌웨어 업데이트 (Updater)", "부트로더 진입 및 펌웨어 업데이트를 수행합니다."),
     }
 
@@ -596,6 +601,17 @@ class MainWindow(QMainWindow):
                     <li><b>반응속도 벤치마크:</b> 화면이 초록색으로 바뀔 때 누르면 본인의 반사 신경과 입력 지연시간을 합산 측정.</li>
                 </ul>
             </div>
+
+            <h2 style="color: #e2b714; font-size: 16px; margin-top: 20px;">🐵 12. 타자 연습 (Monkeytype Studio)</h2>
+            <p><b>역할:</b> Monkeytype 스타일의 실시간 WPM, 정확도, 한글/영문/3x6 스플릿 레이어 특수문자 타자 연습을 진행합니다.</p>
+            <div style="background-color: #161b22; border-left: 3px solid #e2b714; padding: 8px 12px; margin-bottom: 12px; border-radius: 4px;">
+                <b>💡 활용 예시:</b>
+                <ul>
+                    <li><b>3x6 스플릿 레이어 특수문자 훈련:</b> 미니멀 키보드에서 가장 중요한 기호(!, @, #, $, [], {})와 코딩 문법 입력을 집중 훈련.</li>
+                    <li><b>한글 200단어 연습:</b> 쌍자음 롤오버 오타 보정 로직이 적용된 상태에서 실시간 WPM 및 정확도 측정.</li>
+                    <li><b>공식 웹사이트 연동:</b> 상단의 [🌐 monkeytype.com 웹사이트 열기] 버튼으로 공식 웹 버전도 언제든 바로 이용 가능.</li>
+                </ul>
+            </div>
         </div>
         """
         browser.setHtml(guide_html)
@@ -694,7 +710,8 @@ class MainWindow(QMainWindow):
         msg.exec_()
 
     def on_tab_changed(self, index):
-        TabbedKeycodes.close_tray()
+        if hasattr(TabbedKeycodes, "tray") and TabbedKeycodes.tray is not None:
+            TabbedKeycodes.close_tray()
         old_tab = self.current_tab
         new_tab = None
         if index >= 0:
