@@ -20,7 +20,7 @@
         "KC_G"
       ],
       [
-        "KC_LGUI",
+        "TD(9)",
         "TD(1)",
         "TD(2)",
         "TD(3)",
@@ -29,7 +29,7 @@
       ],
       [
         -1,
-        "KC_LALT",
+        "MO(3)",
         -1,
         "KC_LSHIFT",
         "KC_ENTER",
@@ -48,7 +48,7 @@
         "KC_SCOLON",
         "KC_L",
         "KC_K",
-        "LT3(KC_J)",
+        "KC_J",
         "KC_H"
       ],
       [
@@ -375,10 +375,10 @@
       200
     ],
     [
-      "KC_NO",
-      "KC_NO",
-      "KC_NO",
-      "KC_NO",
+      "KC_LALT",
+      "KC_LALT",
+      "KC_LGUI",
+      "KC_LGUI",
       200
     ],
     [
@@ -1298,6 +1298,6 @@
       ]
     }
   },
-  "backup_timestamp": "2026-10-07 15:28:48",
-  "backup_memo": "2026.10.07:15.28 backup"
+  "backup_timestamp": "2026-10-12 09:19:09",
+  "backup_memo": "alt, gui tab dance 설정"
 }
