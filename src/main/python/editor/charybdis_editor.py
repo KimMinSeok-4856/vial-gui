@@ -3,7 +3,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtWidgets import (
     QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QPushButton,
     QSlider, QCheckBox, QGroupBox, QColorDialog, QScrollArea,
-    QWidget, QFrame, QMessageBox, QComboBox
+    QWidget, QFrame, QMessageBox, QComboBox, QSpinBox
 )
 from editor.basic_editor import BasicEditor
 
@@ -183,12 +183,24 @@ class CharybdisEditor(BasicEditor):
         grp.setStyleSheet("QGroupBox { font-size: 14px; font-weight: bold; }")
         grid = QGridLayout(grp)
         grid.setSpacing(12)
+        grid.setColumnStretch(0, 0)
+        grid.setColumnStretch(1, 0)
+        grid.setColumnStretch(2, 1)
+
+        spin_base_style = "font-weight: bold; font-size: 12px; padding: 2px 6px; min-width: 90px;"
 
         # Default DPI
         grid.addWidget(QLabel("기본 커서 감도 (Default DPI):"), 0, 0)
-        self.lbl_default_dpi = QLabel("800 DPI")
-        self.lbl_default_dpi.setStyleSheet("font-weight: bold; color: #58a6ff;")
-        grid.addWidget(self.lbl_default_dpi, 0, 1)
+        self.spin_default_dpi = QSpinBox()
+        self.spin_default_dpi.setRange(200, 3200)
+        self.spin_default_dpi.setSingleStep(50)
+        self.spin_default_dpi.setValue(800)
+        self.spin_default_dpi.setSuffix(" DPI")
+        self.spin_default_dpi.setAlignment(QtCore.Qt.AlignCenter)
+        self.spin_default_dpi.setFixedHeight(28)
+        self.spin_default_dpi.setStyleSheet(spin_base_style + " color: #58a6ff;")
+        self.spin_default_dpi.valueChanged.connect(self._on_default_dpi_spin)
+        grid.addWidget(self.spin_default_dpi, 0, 1)
 
         self.slider_default_dpi = QSlider(QtCore.Qt.Horizontal)
         self.slider_default_dpi.setRange(200, 3200)
@@ -199,9 +211,16 @@ class CharybdisEditor(BasicEditor):
 
         # Sniping DPI
         grid.addWidget(QLabel("스나이퍼 모드 감도 (Sniping DPI):"), 1, 0)
-        self.lbl_sniping_dpi = QLabel("200 DPI")
-        self.lbl_sniping_dpi.setStyleSheet("font-weight: bold; color: #f0883e;")
-        grid.addWidget(self.lbl_sniping_dpi, 1, 1)
+        self.spin_sniping_dpi = QSpinBox()
+        self.spin_sniping_dpi.setRange(100, 1200)
+        self.spin_sniping_dpi.setSingleStep(50)
+        self.spin_sniping_dpi.setValue(200)
+        self.spin_sniping_dpi.setSuffix(" DPI")
+        self.spin_sniping_dpi.setAlignment(QtCore.Qt.AlignCenter)
+        self.spin_sniping_dpi.setFixedHeight(28)
+        self.spin_sniping_dpi.setStyleSheet(spin_base_style + " color: #f0883e;")
+        self.spin_sniping_dpi.valueChanged.connect(self._on_sniping_dpi_spin)
+        grid.addWidget(self.spin_sniping_dpi, 1, 1)
 
         self.slider_sniping_dpi = QSlider(QtCore.Qt.Horizontal)
         self.slider_sniping_dpi.setRange(100, 1200)
@@ -216,9 +235,16 @@ class CharybdisEditor(BasicEditor):
         self.chk_auto_mouse.stateChanged.connect(self._on_config_changed)
         grid.addWidget(self.chk_auto_mouse, 2, 0)
 
-        self.lbl_auto_mouse_time = QLabel("650 ms")
-        self.lbl_auto_mouse_time.setStyleSheet("font-weight: bold; color: #58a6ff;")
-        grid.addWidget(self.lbl_auto_mouse_time, 2, 1)
+        self.spin_auto_mouse_time = QSpinBox()
+        self.spin_auto_mouse_time.setRange(100, 2000)
+        self.spin_auto_mouse_time.setSingleStep(50)
+        self.spin_auto_mouse_time.setValue(650)
+        self.spin_auto_mouse_time.setSuffix(" ms")
+        self.spin_auto_mouse_time.setAlignment(QtCore.Qt.AlignCenter)
+        self.spin_auto_mouse_time.setFixedHeight(28)
+        self.spin_auto_mouse_time.setStyleSheet(spin_base_style + " color: #58a6ff;")
+        self.spin_auto_mouse_time.valueChanged.connect(self._on_auto_mouse_time_spin)
+        grid.addWidget(self.spin_auto_mouse_time, 2, 1)
 
         self.slider_auto_mouse_time = QSlider(QtCore.Qt.Horizontal)
         self.slider_auto_mouse_time.setRange(100, 2000)
@@ -233,9 +259,16 @@ class CharybdisEditor(BasicEditor):
         self.chk_palm_rejection.stateChanged.connect(self._on_config_changed)
         grid.addWidget(self.chk_palm_rejection, 3, 0)
 
-        self.lbl_palm_timeout = QLabel("200 ms")
-        self.lbl_palm_timeout.setStyleSheet("font-weight: bold; color: #3fb950;")
-        grid.addWidget(self.lbl_palm_timeout, 3, 1)
+        self.spin_palm_timeout = QSpinBox()
+        self.spin_palm_timeout.setRange(50, 600)
+        self.spin_palm_timeout.setSingleStep(25)
+        self.spin_palm_timeout.setValue(200)
+        self.spin_palm_timeout.setSuffix(" ms")
+        self.spin_palm_timeout.setAlignment(QtCore.Qt.AlignCenter)
+        self.spin_palm_timeout.setFixedHeight(28)
+        self.spin_palm_timeout.setStyleSheet(spin_base_style + " color: #3fb950;")
+        self.spin_palm_timeout.valueChanged.connect(self._on_palm_timeout_spin)
+        grid.addWidget(self.spin_palm_timeout, 3, 1)
 
         self.slider_palm_timeout = QSlider(QtCore.Qt.Horizontal)
         self.slider_palm_timeout.setRange(50, 600)
@@ -250,8 +283,8 @@ class CharybdisEditor(BasicEditor):
         self.chk_rev_y.stateChanged.connect(self._on_config_changed)
         grid.addWidget(self.chk_rev_y, 4, 0, 1, 3)
 
-        lbl_palm_info = QLabel("ℹ️ 팜 리젝션: 키보드 타이핑 후 설정된 시간(ms) 동안 손바닥/옷소매가 트랙볼에 스쳐도 커서가 튀지 않도록 보호합니다.\n"
-                              "   (의도적으로 마우스를 크게 움직이거나 마우스 버튼/드래그스크롤 사용 시 즉시 반응)")
+        lbl_palm_info = QLabel("ℹ️ 감도 및 대기시간은 슬라이더로 조절하거나 숫자 입력창에 직접 원하는 값을 타이핑할 수 있습니다.\n"
+                              "   (팜 리젝션: 키보드 타이핑 후 설정된 시간(ms) 동안 손바닥/옷소매가 트랙볼에 스쳐도 커서가 튀지 않도록 보호)")
         lbl_palm_info.setStyleSheet("color: #8b949e; font-size: 11px;")
         grid.addWidget(lbl_palm_info, 5, 0, 1, 3)
 
@@ -260,6 +293,12 @@ class CharybdisEditor(BasicEditor):
         self.slider_sniping_dpi.sliderReleased.connect(self._do_auto_save_eeprom)
         self.slider_auto_mouse_time.sliderReleased.connect(self._do_auto_save_eeprom)
         self.slider_palm_timeout.sliderReleased.connect(self._do_auto_save_eeprom)
+
+        # Connect editingFinished for instant auto-save upon pressing Enter or unfocusing
+        self.spin_default_dpi.editingFinished.connect(self._do_auto_save_eeprom)
+        self.spin_sniping_dpi.editingFinished.connect(self._do_auto_save_eeprom)
+        self.spin_auto_mouse_time.editingFinished.connect(self._do_auto_save_eeprom)
+        self.spin_palm_timeout.editingFinished.connect(self._do_auto_save_eeprom)
 
         return grp
 
@@ -324,19 +363,51 @@ class CharybdisEditor(BasicEditor):
         self.set_status(f"⚡ Layer {layer} 색상 적용 및 자동 저장 완료")
 
     def _on_default_dpi_slider(self, val):
-        self.lbl_default_dpi.setText(f"{val} DPI")
+        self.spin_default_dpi.blockSignals(True)
+        self.spin_default_dpi.setValue(val)
+        self.spin_default_dpi.blockSignals(False)
+        self.send_live_config(auto_save_delay=400)
+
+    def _on_default_dpi_spin(self, val):
+        self.slider_default_dpi.blockSignals(True)
+        self.slider_default_dpi.setValue(val)
+        self.slider_default_dpi.blockSignals(False)
         self.send_live_config(auto_save_delay=400)
 
     def _on_sniping_dpi_slider(self, val):
-        self.lbl_sniping_dpi.setText(f"{val} DPI")
+        self.spin_sniping_dpi.blockSignals(True)
+        self.spin_sniping_dpi.setValue(val)
+        self.spin_sniping_dpi.blockSignals(False)
+        self.send_live_config(auto_save_delay=400)
+
+    def _on_sniping_dpi_spin(self, val):
+        self.slider_sniping_dpi.blockSignals(True)
+        self.slider_sniping_dpi.setValue(val)
+        self.slider_sniping_dpi.blockSignals(False)
         self.send_live_config(auto_save_delay=400)
 
     def _on_auto_mouse_time_slider(self, val):
-        self.lbl_auto_mouse_time.setText(f"{val} ms")
+        self.spin_auto_mouse_time.blockSignals(True)
+        self.spin_auto_mouse_time.setValue(val)
+        self.spin_auto_mouse_time.blockSignals(False)
+        self.send_live_config(auto_save_delay=400)
+
+    def _on_auto_mouse_time_spin(self, val):
+        self.slider_auto_mouse_time.blockSignals(True)
+        self.slider_auto_mouse_time.setValue(val)
+        self.slider_auto_mouse_time.blockSignals(False)
         self.send_live_config(auto_save_delay=400)
 
     def _on_palm_timeout_slider(self, val):
-        self.lbl_palm_timeout.setText(f"{val} ms")
+        self.spin_palm_timeout.blockSignals(True)
+        self.spin_palm_timeout.setValue(val)
+        self.spin_palm_timeout.blockSignals(False)
+        self.send_live_config(auto_save_delay=400)
+
+    def _on_palm_timeout_spin(self, val):
+        self.slider_palm_timeout.blockSignals(True)
+        self.slider_palm_timeout.setValue(val)
+        self.slider_palm_timeout.blockSignals(False)
         self.send_live_config(auto_save_delay=400)
 
     def _on_config_changed(self):
@@ -376,22 +447,26 @@ class CharybdisEditor(BasicEditor):
                 self.slider_sniping_dpi.blockSignals(True)
                 self.slider_auto_mouse_time.blockSignals(True)
                 self.slider_palm_timeout.blockSignals(True)
+                self.spin_default_dpi.blockSignals(True)
+                self.spin_sniping_dpi.blockSignals(True)
+                self.spin_auto_mouse_time.blockSignals(True)
+                self.spin_palm_timeout.blockSignals(True)
                 self.chk_auto_mouse.blockSignals(True)
                 self.chk_palm_rejection.blockSignals(True)
                 self.chk_rev_y.blockSignals(True)
                 self.combo_rgb_timeout.blockSignals(True)
 
                 self.slider_default_dpi.setValue(default_dpi)
-                self.lbl_default_dpi.setText(f"{default_dpi} DPI")
+                self.spin_default_dpi.setValue(default_dpi)
 
                 self.slider_sniping_dpi.setValue(sniping_dpi)
-                self.lbl_sniping_dpi.setText(f"{sniping_dpi} DPI")
+                self.spin_sniping_dpi.setValue(sniping_dpi)
 
                 self.slider_auto_mouse_time.setValue(auto_mouse_time)
-                self.lbl_auto_mouse_time.setText(f"{auto_mouse_time} ms")
+                self.spin_auto_mouse_time.setValue(auto_mouse_time)
 
                 self.slider_palm_timeout.setValue(palm_timeout)
-                self.lbl_palm_timeout.setText(f"{palm_timeout} ms")
+                self.spin_palm_timeout.setValue(palm_timeout)
 
                 self.chk_auto_mouse.setChecked(bool(auto_mouse_en))
                 self.chk_palm_rejection.setChecked(bool(palm_en))
@@ -412,6 +487,10 @@ class CharybdisEditor(BasicEditor):
                 self.slider_sniping_dpi.blockSignals(False)
                 self.slider_auto_mouse_time.blockSignals(False)
                 self.slider_palm_timeout.blockSignals(False)
+                self.spin_default_dpi.blockSignals(False)
+                self.spin_sniping_dpi.blockSignals(False)
+                self.spin_auto_mouse_time.blockSignals(False)
+                self.spin_palm_timeout.blockSignals(False)
                 self.chk_auto_mouse.blockSignals(False)
                 self.chk_palm_rejection.blockSignals(False)
                 self.chk_rev_y.blockSignals(False)
@@ -426,15 +505,15 @@ class CharybdisEditor(BasicEditor):
             return
 
         try:
-            def_dpi = self.slider_default_dpi.value()
-            snp_dpi = self.slider_sniping_dpi.value()
+            def_dpi = self.spin_default_dpi.value()
+            snp_dpi = self.spin_sniping_dpi.value()
             auto_en = 1 if self.chk_auto_mouse.isChecked() else 0
             auto_layer = 3
-            auto_time = self.slider_auto_mouse_time.value()
+            auto_time = self.spin_auto_mouse_time.value()
             buf = 20
             rev_y = 1 if self.chk_rev_y.isChecked() else 0
             palm_en = 1 if self.chk_palm_rejection.isChecked() else 0
-            palm_timeout = self.slider_palm_timeout.value()
+            palm_timeout = self.spin_palm_timeout.value()
 
             l1 = self.layer_swatches[1].current_rgb
             l2 = self.layer_swatches[2].current_rgb
