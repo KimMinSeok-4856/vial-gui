@@ -211,12 +211,15 @@ class CharybdisEditor(BasicEditor):
         grid.addWidget(self.slider_sniping_dpi, 1, 2)
 
         # Auto-Mouse Checkbox & Time
-        self.chk_auto_mouse = QCheckBox("트랙볼 이동 시 마우스 레이어(Layer 3) 자동 활성화")
+        self.chk_auto_mouse = QCheckBox("마우스 레이어(L3) 자동 전환:")
         self.chk_auto_mouse.setChecked(True)
         self.chk_auto_mouse.stateChanged.connect(self._on_config_changed)
-        grid.addWidget(self.chk_auto_mouse, 2, 0, 1, 2)
+        grid.addWidget(self.chk_auto_mouse, 2, 0)
 
-        self.lbl_auto_mouse_time = QLabel("650 ms (복귀 대기시간)")
+        self.lbl_auto_mouse_time = QLabel("650 ms")
+        self.lbl_auto_mouse_time.setStyleSheet("font-weight: bold; color: #58a6ff;")
+        grid.addWidget(self.lbl_auto_mouse_time, 2, 1)
+
         self.slider_auto_mouse_time = QSlider(QtCore.Qt.Horizontal)
         self.slider_auto_mouse_time.setRange(100, 2000)
         self.slider_auto_mouse_time.setSingleStep(50)
@@ -224,16 +227,39 @@ class CharybdisEditor(BasicEditor):
         self.slider_auto_mouse_time.valueChanged.connect(self._on_auto_mouse_time_slider)
         grid.addWidget(self.slider_auto_mouse_time, 2, 2)
 
+        # Smart Mouse Palm Rejection Checkbox & Time
+        self.chk_palm_rejection = QCheckBox("스마트 마우스 팜 리젝션:")
+        self.chk_palm_rejection.setChecked(True)
+        self.chk_palm_rejection.stateChanged.connect(self._on_config_changed)
+        grid.addWidget(self.chk_palm_rejection, 3, 0)
+
+        self.lbl_palm_timeout = QLabel("200 ms")
+        self.lbl_palm_timeout.setStyleSheet("font-weight: bold; color: #3fb950;")
+        grid.addWidget(self.lbl_palm_timeout, 3, 1)
+
+        self.slider_palm_timeout = QSlider(QtCore.Qt.Horizontal)
+        self.slider_palm_timeout.setRange(50, 600)
+        self.slider_palm_timeout.setSingleStep(25)
+        self.slider_palm_timeout.setValue(200)
+        self.slider_palm_timeout.valueChanged.connect(self._on_palm_timeout_slider)
+        grid.addWidget(self.slider_palm_timeout, 3, 2)
+
         # Drag Scroll Invert Y
         self.chk_rev_y = QCheckBox("드래그 스크롤 세로 방향 반전 (자연스러운 휠 스크롤)")
         self.chk_rev_y.setChecked(True)
         self.chk_rev_y.stateChanged.connect(self._on_config_changed)
-        grid.addWidget(self.chk_rev_y, 3, 0, 1, 2)
+        grid.addWidget(self.chk_rev_y, 4, 0, 1, 3)
+
+        lbl_palm_info = QLabel("ℹ️ 팜 리젝션: 키보드 타이핑 후 설정된 시간(ms) 동안 손바닥/옷소매가 트랙볼에 스쳐도 커서가 튀지 않도록 보호합니다.\n"
+                              "   (의도적으로 마우스를 크게 움직이거나 마우스 버튼/드래그스크롤 사용 시 즉시 반응)")
+        lbl_palm_info.setStyleSheet("color: #8b949e; font-size: 11px;")
+        grid.addWidget(lbl_palm_info, 5, 0, 1, 3)
 
         # Connect sliderReleased for instant auto-save upon release
         self.slider_default_dpi.sliderReleased.connect(self._do_auto_save_eeprom)
         self.slider_sniping_dpi.sliderReleased.connect(self._do_auto_save_eeprom)
         self.slider_auto_mouse_time.sliderReleased.connect(self._do_auto_save_eeprom)
+        self.slider_palm_timeout.sliderReleased.connect(self._do_auto_save_eeprom)
 
         return grp
 
@@ -309,6 +335,10 @@ class CharybdisEditor(BasicEditor):
         self.lbl_auto_mouse_time.setText(f"{val} ms")
         self.send_live_config(auto_save_delay=400)
 
+    def _on_palm_timeout_slider(self, val):
+        self.lbl_palm_timeout.setText(f"{val} ms")
+        self.send_live_config(auto_save_delay=400)
+
     def _on_config_changed(self):
         self.send_live_config(auto_save_delay=50)
 
@@ -336,12 +366,18 @@ class CharybdisEditor(BasicEditor):
                 l2 = (resp[15], resp[16], resp[17])
                 l3 = (resp[18], resp[19], resp[20])
                 timeout_sec = ((resp[21] << 8) | resp[22]) if len(resp) >= 23 else 60
+                palm_en = resp[25] if len(resp) >= 26 else 1
+                palm_timeout = ((resp[26] << 8) | resp[27]) if len(resp) >= 28 else 200
+                if palm_timeout == 0:
+                    palm_timeout = 200
 
                 # Block signals during load
                 self.slider_default_dpi.blockSignals(True)
                 self.slider_sniping_dpi.blockSignals(True)
                 self.slider_auto_mouse_time.blockSignals(True)
+                self.slider_palm_timeout.blockSignals(True)
                 self.chk_auto_mouse.blockSignals(True)
+                self.chk_palm_rejection.blockSignals(True)
                 self.chk_rev_y.blockSignals(True)
                 self.combo_rgb_timeout.blockSignals(True)
 
@@ -354,7 +390,11 @@ class CharybdisEditor(BasicEditor):
                 self.slider_auto_mouse_time.setValue(auto_mouse_time)
                 self.lbl_auto_mouse_time.setText(f"{auto_mouse_time} ms")
 
+                self.slider_palm_timeout.setValue(palm_timeout)
+                self.lbl_palm_timeout.setText(f"{palm_timeout} ms")
+
                 self.chk_auto_mouse.setChecked(bool(auto_mouse_en))
+                self.chk_palm_rejection.setChecked(bool(palm_en))
                 self.chk_rev_y.setChecked(bool(rev_y))
 
                 self.layer_swatches[1].set_color(l1)
@@ -371,7 +411,9 @@ class CharybdisEditor(BasicEditor):
                 self.slider_default_dpi.blockSignals(False)
                 self.slider_sniping_dpi.blockSignals(False)
                 self.slider_auto_mouse_time.blockSignals(False)
+                self.slider_palm_timeout.blockSignals(False)
                 self.chk_auto_mouse.blockSignals(False)
+                self.chk_palm_rejection.blockSignals(False)
                 self.chk_rev_y.blockSignals(False)
                 self.combo_rgb_timeout.blockSignals(False)
 
@@ -391,6 +433,8 @@ class CharybdisEditor(BasicEditor):
             auto_time = self.slider_auto_mouse_time.value()
             buf = 20
             rev_y = 1 if self.chk_rev_y.isChecked() else 0
+            palm_en = 1 if self.chk_palm_rejection.isChecked() else 0
+            palm_timeout = self.slider_palm_timeout.value()
 
             l1 = self.layer_swatches[1].current_rgb
             l2 = self.layer_swatches[2].current_rgb
@@ -410,7 +454,10 @@ class CharybdisEditor(BasicEditor):
                 l1[0], l1[1], l1[2],
                 l2[0], l2[1], l2[2],
                 l3[0], l3[1], l3[2],
-                (timeout_sec >> 8) & 0xFF, timeout_sec & 0xFF
+                (timeout_sec >> 8) & 0xFF, timeout_sec & 0xFF,
+                0, 0,
+                palm_en,
+                (palm_timeout >> 8) & 0xFF, palm_timeout & 0xFF
             ]
             pkt += [0] * (32 - len(pkt))
             self.device.send(bytes(pkt))
