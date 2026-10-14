@@ -20,7 +20,7 @@
         "KC_G"
       ],
       [
-        "TD(9)",
+        "KC_LGUI",
         "TD(1)",
         "TD(2)",
         "TD(3)",
@@ -29,7 +29,7 @@
       ],
       [
         -1,
-        "MO(3)",
+        "KC_LALT",
         -1,
         "KC_LSHIFT",
         "KC_ENTER",
@@ -1275,9 +1275,9 @@
     "27": 0
   },
   "charybdis_config": {
-    "default_dpi": 603,
+    "default_dpi": 599,
     "sniping_dpi": 200,
-    "auto_mouse_enable": false,
+    "auto_mouse_enable": true,
     "auto_mouse_time": 650,
     "scroll_invert_y": true,
     "layer_colors": {
@@ -1298,6 +1298,6 @@
       ]
     }
   },
-  "backup_timestamp": "2026-10-12 09:19:09",
-  "backup_memo": "alt, gui tab dance 설정"
+  "backup_timestamp": "2026-10-14 14:48:19",
+  "backup_memo": "261014 백업,"
 }
