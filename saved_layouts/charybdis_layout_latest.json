@@ -20,7 +20,7 @@
         "KC_G"
       ],
       [
-        "TD(9)",
+        "KC_LGUI",
         "TD(1)",
         "TD(2)",
         "TD(3)",
@@ -29,7 +29,7 @@
       ],
       [
         -1,
-        "MO(3)",
+        "TD(9)",
         -1,
         "KC_LSHIFT",
         "KC_ENTER",
@@ -375,10 +375,10 @@
       200
     ],
     [
+      "MO(3)",
+      "MO(3)",
       "KC_LALT",
       "KC_LALT",
-      "KC_LGUI",
-      "KC_LGUI",
       200
     ],
     [
@@ -1298,6 +1298,6 @@
       ]
     }
   },
-  "backup_timestamp": "2026-10-19 09:39:57",
-  "backup_memo": "261019 back up"
+  "backup_timestamp": "2026-10-19 14:30:30",
+  "backup_memo": "fn 키 altL + mo(3) 조합으로 변경"
 }
