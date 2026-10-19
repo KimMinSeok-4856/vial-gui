@@ -20,7 +20,7 @@
         "KC_G"
       ],
       [
-        "KC_LGUI",
+        "TD(9)",
         "TD(1)",
         "TD(2)",
         "TD(3)",
@@ -29,7 +29,7 @@
       ],
       [
         -1,
-        "KC_LALT",
+        "MO(3)",
         -1,
         "KC_LSHIFT",
         "KC_ENTER",
@@ -1275,9 +1275,9 @@
     "27": 0
   },
   "charybdis_config": {
-    "default_dpi": 599,
+    "default_dpi": 603,
     "sniping_dpi": 200,
-    "auto_mouse_enable": true,
+    "auto_mouse_enable": false,
     "auto_mouse_time": 650,
     "scroll_invert_y": true,
     "layer_colors": {
@@ -1298,6 +1298,6 @@
       ]
     }
   },
-  "backup_timestamp": "2026-10-14 14:48:19",
-  "backup_memo": "261014 백업,"
+  "backup_timestamp": "2026-10-19 09:39:57",
+  "backup_memo": "261019 back up"
 }
