@@ -1275,7 +1275,7 @@
     "27": 0
   },
   "charybdis_config": {
-    "default_dpi": 603,
+    "default_dpi": 600,
     "sniping_dpi": 200,
     "auto_mouse_enable": false,
     "auto_mouse_time": 650,
@@ -1298,6 +1298,6 @@
       ]
     }
   },
-  "backup_timestamp": "2026-10-19 14:30:30",
-  "backup_memo": "fn 키 altL + mo(3) 조합으로 변경"
+  "backup_timestamp": "2026-11-21 10:16:22",
+  "backup_memo": "261121"
 }
